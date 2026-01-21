@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Whiteboard</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 10px 12px; border-bottom: 1px solid rgba(127,127,127,.35);
+      background: Canvas; color: CanvasText;
+    }
+    header .group { display: flex; align-items: center; gap: 8px; padding-right: 10px; border-right: 1px solid rgba(127,127,127,.25); }
+    header .group:last-child { border-right: 0; padding-right: 0; }
+    button, select, input[type="color"], input[type="range"] {
+      font: inherit;
+    }
+    button {
+      padding: 7px 10px; border-radius: 10px;
+      border: 1px solid rgba(127,127,127,.45);
+      background: rgba(127,127,127,.12);
+      cursor: pointer;
+    }
+    button.active { outline: 2px solid Highlight; outline-offset: 1px; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    #wrap { position: relative; height: calc(100vh - 64px); }
+    canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      touch-action: none; /* important for pen/touch */
+      background: #ffffff;
+    }
+    .hint {
+      margin-left: auto;
+      opacity: .75;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .kbd { padding: 2px 6px; border: 1px solid rgba(127,127,127,.45); border-radius: 6px; font-size: 11px; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="group">
+    <button id="toolPen" class="active" title="Draw (P)">Pen</button>
+    <button id="toolEraser" title="Eraser (E)">Eraser</button>
+    <button id="toolSelect" title="Select/Move images (V)">Select</button>
+    <button id="toolText" title="Add text (T)">Text</button>
+  </div>
+
+  <div class="group">
+    <label>Color <input id="color" type="color" value="#111111" /></label>
+    <label>Size <input id="size" type="range" min="1" max="40" value="4" /></label>
+  </div>
+
+  <div class="group">
+    <label>
+      Add image
+      <input id="imgInput" type="file" accept="image/*" multiple />
+    </label>
+    <button id="bringFront" title="Bring selected image to front">Front</button>
+    <button id="sendBack" title="Send selected image to back">Back</button>
+  </div>
+
+  <div class="group">
+    <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
+    <button id="redo" title="Redo (Ctrl+Y)">Redo</button>
+    <button id="clear">Clear</button>
+    <button id="export">Export PNG</button>
+  </div>
+
+  <div class="hint">
+    Drag & drop images onto the board. Select tool: drag image to move, drag corner to resize. Delete removes selected image.
+    <span class="kbd">P</span> <span class="kbd">E</span> <span class="kbd">V</span> <span class="kbd">T</span>
+  </div>
+</header>
+
+<div id="wrap">
+  <canvas id="board"></canvas>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("board");
+  const ctx = canvas.getContext("2d");
+
+  // --- HiDPI resize ---
+  function resize() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    redraw();
+  }
+  window.addEventListener("resize", resize);
+
+  // --- State ---
+  const Tool = { PEN: "pen", ERASER: "eraser", SELECT: "select", TEXT: "text" };
+  let tool = Tool.PEN;
+
+  const paths = [];         // { mode:'draw'|'erase', color, size, points:[{x,y}] }
+  const images = [];        // { img, x,y,w,h } in CSS pixels
+  let selectedImg = -1;
+
+  // undo/redo: snapshot-based (simple and reliable)
+  const undoStack = [];
+  const redoStack = [];
+  function snapshot() {
+    undoStack.push(serializeState());
+    if (undoStack.length > 80) undoStack.shift();
+    redoStack.length = 0;
+    updateUndoRedoButtons();
+  }
+  function serializeState() {
+    return {
+      paths: structuredClone(paths),
+      images: images.map(it => ({ src: it.img.src, x: it.x, y: it.y, w: it.w, h: it.h })),
+      selectedImg
+    };
+  }
+  async function restoreState(state) {
+    paths.length = 0;
+    state.paths.forEach(p => paths.push(p));
+    images.length = 0;
+    for (const im of state.images) {
+      const img = await loadImage(im.src);
+      images.push({ img, x: im.x, y: im.y, w: im.w, h: im.h });
+    }
+    selectedImg = state.selectedImg;
+    redraw();
+    updateUndoRedoButtons();
+  }
+
+  function updateUndoRedoButtons() {
+    document.getElementById("undo").disabled = undoStack.length === 0;
+    document.getElementById("redo").disabled = redoStack.length === 0;
+  }
+
+  // --- UI ---
+  const btn = {
+    pen: document.getElementById("toolPen"),
+    eraser: document.getElementById("toolEraser"),
+    select: document.getElementById("toolSelect"),
+    text: document.getElementById("toolText"),
+  };
+  function setTool(t) {
+    tool = t;
+    for (const k of Object.keys(btn)) btn[k].classList.remove("active");
+    if (t === Tool.PEN) btn.pen.classList.add("active");
+    if (t === Tool.ERASER) btn.eraser.classList.add("active");
+    if (t === Tool.SELECT) btn.select.classList.add("active");
+    if (t === Tool.TEXT) btn.text.classList.add("active");
+  }
+  btn.pen.onclick = () => setTool(Tool.PEN);
+  btn.eraser.onclick = () => setTool(Tool.ERASER);
+  btn.select.onclick = () => setTool(Tool.SELECT);
+  btn.text.onclick = () => setTool(Tool.TEXT);
+
+  const colorEl = document.getElementById("color");
+  const sizeEl = document.getElementById("size");
+
+  document.getElementById("undo").onclick = async () => {
+    if (!undoStack.length) return;
+    redoStack.push(serializeState());
+    const prev = undoStack.pop();
+    await restoreState(prev);
+  };
+  document.getElementById("redo").onclick = async () => {
+    if (!redoStack.length) return;
+    undoStack.push(serializeState());
+    const next = redoStack.pop();
+    await restoreState(next);
+  };
+  document.getElementById("clear").onclick = () => {
+    snapshot();
+    paths.length = 0;
+    images.length = 0;
+    selectedImg = -1;
+    redraw();
+  };
+  document.getElementById("export").onclick = () => {
+    // export at current canvas resolution (HiDPI) but drawn in CSS pixels; easiest: use toDataURL
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "whiteboard.png";
+    a.click();
+  };
+
+  document.getElementById("bringFront").onclick = () => {
+    if (selectedImg < 0) return;
+    snapshot();
+    const it = images.splice(selectedImg, 1)[0];
+    images.push(it);
+    selectedImg = images.length - 1;
+    redraw();
+  };
+  document.getElementById("sendBack").onclick = () => {
+    if (selectedImg < 0) return;
+    snapshot();
+    const it = images.splice(selectedImg, 1)[0];
+    images.unshift(it);
+    selectedImg = 0;
+    redraw();
+  };
+
+  // --- Image import (file input + drag/drop) ---
+  const imgInput = document.getElementById("imgInput");
+  imgInput.addEventListener("change", async (e) => {
+    const files = [...(e.target.files || [])];
+    if (!files.length) return;
+    await addFilesAsImages(files);
+    imgInput.value = "";
+  });
+
+  const wrap = document.getElementById("wrap");
+  wrap.addEventListener("dragover", (e) => { e.preventDefault(); });
+  wrap.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith("image/"));
+    if (files.length) await addFilesAsImages(files);
+  });
+
+  async function addFilesAsImages(files) {
+    snapshot();
+    for (const file of files) {
+      const src = await fileToDataURL(file);
+      const img = await loadImage(src);
+      // place roughly centered; scale down if huge
+      const rect = canvas.getBoundingClientRect();
+      const maxW = rect.width * 0.7;
+      const maxH = rect.height * 0.7;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      const s = Math.min(1, maxW / w, maxH / h);
+      w = w * s; h = h * s;
+      const x = (rect.width - w) / 2;
+      const y = (rect.height - h) / 2;
+      images.push({ img, x, y, w, h });
+      selectedImg = images.length - 1;
+    }
+    redraw();
+  }
+
+  function fileToDataURL(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  }
+  function loadImage(src) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = src;
+    });
+  }
+
+  // --- Drawing helpers ---
+  function getPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top);
+    return { x, y };
+  }
+
+  function hitTestImage(pt) {
+    for (let i = images.length - 1; i >= 0; i--) { // topmost first
+      const im = images[i];
+      if (pt.x >= im.x && pt.x <= im.x + im.w && pt.y >= im.y && pt.y <= im.y + im.h) return i;
+    }
+    return -1;
+  }
+
+  function drawSelection(im) {
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+    ctx.strokeRect(im.x, im.y, im.w, im.h);
+    ctx.setLineDash([]);
+    // resize handle (bottom-right)
+    const hs = 10;
+    ctx.fillStyle = "rgba(0, 120, 255, 0.9)";
+    ctx.fillRect(im.x + im.w - hs, im.y + im.h - hs, hs, hs);
+    ctx.restore();
+  }
+
+  function pointInResizeHandle(pt, im) {
+    const hs = 14;
+    const rx = im.x + im.w - hs;
+    const ry = im.y + im.h - hs;
+    return pt.x >= rx && pt.x <= rx + hs && pt.y >= ry && pt.y <= ry + hs;
+  }
+
+  // --- Render ---
+  function redraw() {
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    // background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    // images
+    for (let i = 0; i < images.length; i++) {
+      const im = images[i];
+      ctx.drawImage(im.img, im.x, im.y, im.w, im.h);
+    }
+
+    // paths (draw and erase)
+    for (const p of paths) {
+      if (p.points.length < 2) continue;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.lineWidth = p.size;
+      if (p.mode === "erase") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = p.color;
+      }
+      ctx.beginPath();
+      ctx.moveTo(p.points[0].x, p.points[0].y);
+      for (let i = 1; i < p.points.length; i++) ctx.lineTo(p.points[i].x, p.points[i].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // selection overlay
+    if (selectedImg >= 0 && images[selectedImg]) {
+      drawSelection(images[selectedImg]);
+    }
+  }
+
+  // --- Interaction ---
+  let isPointerDown = false;
+  let activePath = null;
+
+  let dragMode = null; // 'move' | 'resize'
+  let dragStart = null;
+  let imgStart = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    isPointerDown = true;
+    const pt = getPoint(e);
+
+    if (tool === Tool.TEXT) {
+      snapshot();
+      const text = prompt("Text:");
+      if (text && text.trim()) {
+        // store as a very small "path" type using points + meta, simplest: render immediately into paths by drawing as vector not stored
+        // Better: push a special path mode 'text'
+        paths.push({ mode: "text", color: colorEl.value, size: Number(sizeEl.value), points: [pt], text });
+        redraw();
+      }
+      isPointerDown = false;
+      return;
+    }
+
+    if (tool === Tool.SELECT) {
+      const idx = hitTestImage(pt);
+      selectedImg = idx;
+      if (idx >= 0) {
+        const im = images[idx];
+        snapshot();
+        if (pointInResizeHandle(pt, im)) {
+          dragMode = "resize";
+        } else {
+          dragMode = "move";
+        }
+        dragStart = pt;
+        imgStart = { x: im.x, y: im.y, w: im.w, h: im.h };
+      } else {
+        redraw();
+      }
+      return;
+    }
+
+    // pen/eraser
+    snapshot();
+    activePath = {
+      mode: (tool === Tool.ERASER) ? "erase" : "draw",
+      color: colorEl.value,
+      size: Number(sizeEl.value),
+      points: [pt]
+    };
+    paths.push(activePath);
+    redraw();
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!isPointerDown) return;
+    const pt = getPoint(e);
+
+    if (tool === Tool.SELECT && selectedImg >= 0 && images[selectedImg] && dragMode) {
+      const im = images[selectedImg];
+      if (dragMode === "move") {
+        im.x = imgStart.x + (pt.x - dragStart.x);
+        im.y = imgStart.y + (pt.y - dragStart.y);
+      } else if (dragMode === "resize") {
+        const nw = Math.max(20, imgStart.w + (pt.x - dragStart.x));
+        const nh = Math.max(20, imgStart.h + (pt.y - dragStart.y));
+        im.w = nw;
+        im.h = nh;
+      }
+      redraw();
+      return;
+    }
+
+    if ((tool === Tool.PEN || tool === Tool.ERASER) && activePath) {
+      // add points with mild throttling by distance
+      const last = activePath.points[activePath.points.length - 1];
+      const dx = pt.x - last.x, dy = pt.y - last.y;
+      if ((dx*dx + dy*dy) >= 1.5) {
+        activePath.points.push(pt);
+        redraw();
+      }
+    }
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    isPointerDown = false;
+    activePath = null;
+    dragMode = null;
+    dragStart = null;
+    imgStart = null;
+    // clean up: if last action created empty path
+    if (paths.length && (paths[paths.length - 1].mode === "draw" || paths[paths.length - 1].mode === "erase")) {
+      const p = paths[paths.length - 1];
+      if (p.points.length < 2) paths.pop();
+    }
+    redraw();
+    updateUndoRedoButtons();
+  });
+
+  // Render text paths in redraw: do it at end so text sits on top.
+  // (We keep it as "paths" entry so undo/redo works.)
+  const originalRedraw = redraw;
+  redraw = function() {
+    originalRedraw();
+    const rect = canvas.getBoundingClientRect();
+    for (const p of paths) {
+      if (p.mode !== "text") continue;
+      const pt = p.points[0];
+      ctx.save();
+      ctx.fillStyle = p.color;
+      const px = Math.max(10, p.size * 4);
+      ctx.font = `${Math.max(12, Math.round(p.size * 4))}px system-ui, sans-serif`;
+      ctx.textBaseline = "top";
+      // simple wrap
+      const maxW = rect.width - pt.x - 10;
+      const words = String(p.text).split(/\s+/);
+      let line = "";
+      let y = pt.y;
+      for (const w of words) {
+        const test = line ? line + " " + w : w;
+        if (ctx.measureText(test).width > maxW && line) {
+          ctx.fillText(line, pt.x, y);
+          y += px;
+          line = w;
+        } else {
+          line = test;
+        }
+      }
+      if (line) ctx.fillText(line, pt.x, y);
+      ctx.restore();
+    }
+    // selection again on top
+    if (selectedImg >= 0 && images[selectedImg]) drawSelection(images[selectedImg]);
+  };
+
+  // Keyboard shortcuts
+  window.addEventListener("keydown", async (e) => {
+    const key = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && key === "z") { e.preventDefault(); document.getElementById("undo").click(); return; }
+    if ((e.ctrlKey || e.metaKey) && (key === "y" || (e.shiftKey && key === "z"))) { e.preventDefault(); document.getElementById("redo").click(); return; }
+    if (key === "p") setTool(Tool.PEN);
+    if (key === "e") setTool(Tool.ERASER);
+    if (key === "v") setTool(Tool.SELECT);
+    if (key === "t") setTool(Tool.TEXT);
+
+    if (key === "delete" || key === "backspace") {
+      if (selectedImg >= 0) {
+        snapshot();
+        images.splice(selectedImg, 1);
+        selectedImg = -1;
+        redraw();
+      }
+    }
+  });
+
+  // initial
+  resize();
+  updateUndoRedoButtons();
+})();
+</script>
+</body>
+</html>
