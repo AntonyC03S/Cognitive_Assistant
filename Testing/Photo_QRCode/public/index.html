@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QR Upload → Display</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>QR Upload → Display</h1>
+
+      <section class="panel">
+        <h2>1) Generate a QR code</h2>
+
+        <label class="label">
+          Base URL (must be reachable by your phone)
+          <input id="baseUrl" class="input" placeholder="e.g. http://192.168.1.50:3000" />
+        </label>
+
+        <button id="makeQrBtn" class="button">Generate QR</button>
+
+        <p class="muted">
+          Tip: If you open this site using <code>localhost</code>, your phone won’t be able to reach it.
+          Open it using your computer’s LAN IP instead (examples below).
+        </p>
+
+        <div id="status" class="status"></div>
+
+        <div class="qrRow">
+          <div>
+            <div id="qr" class="qrBox"></div>
+            <a id="uploadLink" href="#" target="_blank" rel="noreferrer" class="link"></a>
+          </div>
+
+          <div class="preview">
+            <div class="previewTitle">Latest uploaded image</div>
+            <img id="resultImg" alt="Uploaded will appear here" />
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Socket.IO served by the server -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- QR library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="/client.js"></script>
+  </body>
+</html>

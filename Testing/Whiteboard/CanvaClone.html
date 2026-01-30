@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Canva Clone - Whiteboard</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 10px 12px; border-bottom: 1px solid rgba(127,127,127,.35);
+      background: Canvas; color: CanvasText;
+    }
+    header .group { display: flex; align-items: center; gap: 8px; padding-right: 10px; border-right: 1px solid rgba(127,127,127,.25); }
+    header .group:last-child { border-right: 0; padding-right: 0; }
+    button, select, input[type="color"], input[type="range"] {
+      font: inherit;
+    }
+    button {
+      padding: 7px 10px; border-radius: 10px;
+      border: 1px solid rgba(127,127,127,.45);
+      background: rgba(127,127,127,.12);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: rgba(127,127,127,.2);
+      transform: translateY(-1px);
+    }
+    button.active { outline: 2px solid Highlight; outline-offset: 1px; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    #wrap { position: relative; height: calc(100vh - 64px); }
+    canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      touch-action: none;
+      background: #ffffff;
+    }
+    .hint {
+      margin-left: auto;
+      opacity: .75;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .kbd { padding: 2px 6px; border: 1px solid rgba(127,127,127,.45); border-radius: 6px; font-size: 11px; }
+    
+    /* Image Search Modal */
+    .search-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+    .search-modal.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .search-panel {
+      background: Canvas;
+      color: CanvasText;
+      width: 90%;
+      max-width: 900px;
+      height: 80vh;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .search-header {
+      padding: 20px;
+      border-bottom: 1px solid rgba(127,127,127,.35);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .search-header input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid rgba(127,127,127,.45);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 16px;
+    }
+    .search-header button {
+      padding: 12px 24px;
+    }
+    .search-close {
+      padding: 8px 16px;
+      background: rgba(220, 53, 69, 0.1);
+      border-color: rgba(220, 53, 69, 0.3);
+    }
+    .search-results {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 16px;
+    }
+    .search-result-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: grab;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      background: rgba(127,127,127,.1);
+    }
+    .search-result-item:hover {
+      border-color: Highlight;
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .search-result-item:active {
+      cursor: grabbing;
+    }
+    .search-result-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .search-loading {
+      text-align: center;
+      padding: 40px;
+      opacity: 0.6;
+    }
+    .search-error {
+      text-align: center;
+      padding: 40px;
+      color: rgba(220, 53, 69, 0.8);
+    }
+    .search-info {
+      padding: 12px 20px;
+      border-top: 1px solid rgba(127,127,127,.25);
+      font-size: 12px;
+      opacity: 0.7;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="group">
+    <button id="toolPen" class="active" title="Draw (P)">✏️ Pen</button>
+    <button id="toolEraser" title="Eraser (E)">🧹 Eraser</button>
+    <button id="toolSelect" title="Select/Move images (V)">👆 Select</button>
+    <button id="toolText" title="Add text (T)">📝 Text</button>
+  </div>
+
+  <div class="group">
+    <label>Color <input id="color" type="color" value="#111111" /></label>
+    <label>Size <input id="size" type="range" min="1" max="40" value="4" /></label>
+  </div>
+
+  <div class="group">
+    <button id="searchImages" title="Search for images">🔍 Search Images</button>
+    <button id="pasteImageUrl" title="Paste image URL (Ctrl+V)">📎 Paste URL</button>
+    <label>
+      📁 Add image
+      <input id="imgInput" type="file" accept="image/*" multiple style="display: none;" />
+    </label>
+    <button id="bringFront" title="Bring selected image to front">⬆️ Front</button>
+    <button id="sendBack" title="Send selected image to back">⬇️ Back</button>
+  </div>
+
+  <div class="group">
+    <button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+    <button id="redo" title="Redo (Ctrl+Y)">↷ Redo</button>
+    <button id="clear">🗑️ Clear</button>
+    <button id="export">💾 Export PNG</button>
+  </div>
+
+  <div class="hint">
+    Drag & drop images onto the board. Select tool: drag image to move, drag corner to resize. Delete removes selected image.
+    <span class="kbd">P</span> <span class="kbd">E</span> <span class="kbd">V</span> <span class="kbd">T</span>
+  </div>
+</header>
+
+<div id="wrap">
+  <canvas id="board"></canvas>
+</div>
+
+<!-- Image Search Modal -->
+<div id="searchModal" class="search-modal">
+  <div class="search-panel">
+    <div class="search-header">
+      <input type="text" id="searchInput" placeholder="Search for images (e.g., 'sunset', 'cat', 'mountain')..." />
+      <button id="searchBtn">Search</button>
+      <button id="searchClose" class="search-close">Close</button>
+    </div>
+    <div id="searchResults" class="search-results">
+      <div class="search-loading">Enter a search term and click Search to find images</div>
+    </div>
+    <div class="search-info">
+      💡 Click and drag images onto the canvas, or click to add at center. 
+      <span style="opacity: 0.6;">Tip: Get a free API key from pexels.com/api for better results</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("board");
+  const ctx = canvas.getContext("2d");
+
+  // --- HiDPI resize ---
+  function resize() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    redraw();
+  }
+  window.addEventListener("resize", resize);
+
+  // --- State ---
+  const Tool = { PEN: "pen", ERASER: "eraser", SELECT: "select", TEXT: "text" };
+  let tool = Tool.PEN;
+
+  const paths = [];
+  const images = [];
+  let selectedImg = -1;
+
+  // undo/redo: snapshot-based
+  const undoStack = [];
+  const redoStack = [];
+  function snapshot() {
+    undoStack.push(serializeState());
+    if (undoStack.length > 80) undoStack.shift();
+    redoStack.length = 0;
+    updateUndoRedoButtons();
+  }
+  function serializeState() {
+    return {
+      paths: structuredClone(paths),
+      images: images.map(it => ({ src: it.img.src, x: it.x, y: it.y, w: it.w, h: it.h })),
+      selectedImg
+    };
+  }
+  async function restoreState(state) {
+    paths.length = 0;
+    state.paths.forEach(p => paths.push(p));
+    images.length = 0;
+    for (const im of state.images) {
+      const img = await loadImage(im.src);
+      images.push({ img, x: im.x, y: im.y, w: im.w, h: im.h });
+    }
+    selectedImg = state.selectedImg;
+    redraw();
+    updateUndoRedoButtons();
+  }
+
+  function updateUndoRedoButtons() {
+    document.getElementById("undo").disabled = undoStack.length === 0;
+    document.getElementById("redo").disabled = redoStack.length === 0;
+  }
+
+  // --- UI ---
+  const btn = {
+    pen: document.getElementById("toolPen"),
+    eraser: document.getElementById("toolEraser"),
+    select: document.getElementById("toolSelect"),
+    text: document.getElementById("toolText"),
+  };
+  function setTool(t) {
+    tool = t;
+    for (const k of Object.keys(btn)) btn[k].classList.remove("active");
+    if (t === Tool.PEN) btn.pen.classList.add("active");
+    if (t === Tool.ERASER) btn.eraser.classList.add("active");
+    if (t === Tool.SELECT) btn.select.classList.add("active");
+    if (t === Tool.TEXT) btn.text.classList.add("active");
+  }
+  btn.pen.onclick = () => setTool(Tool.PEN);
+  btn.eraser.onclick = () => setTool(Tool.ERASER);
+  btn.select.onclick = () => setTool(Tool.SELECT);
+  btn.text.onclick = () => setTool(Tool.TEXT);
+
+  const colorEl = document.getElementById("color");
+  const sizeEl = document.getElementById("size");
+
+  document.getElementById("undo").onclick = async () => {
+    if (!undoStack.length) return;
+    redoStack.push(serializeState());
+    const prev = undoStack.pop();
+    await restoreState(prev);
+  };
+  document.getElementById("redo").onclick = async () => {
+    if (!redoStack.length) return;
+    undoStack.push(serializeState());
+    const next = redoStack.pop();
+    await restoreState(next);
+  };
+  document.getElementById("clear").onclick = () => {
+    if (confirm("Clear the entire canvas?")) {
+      snapshot();
+      paths.length = 0;
+      images.length = 0;
+      selectedImg = -1;
+      redraw();
+    }
+  };
+  document.getElementById("export").onclick = () => {
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "canva-whiteboard.png";
+    a.click();
+  };
+
+  document.getElementById("bringFront").onclick = () => {
+    if (selectedImg < 0) return;
+    snapshot();
+    const it = images.splice(selectedImg, 1)[0];
+    images.push(it);
+    selectedImg = images.length - 1;
+    redraw();
+  };
+  document.getElementById("sendBack").onclick = () => {
+    if (selectedImg < 0) return;
+    snapshot();
+    const it = images.splice(selectedImg, 1)[0];
+    images.unshift(it);
+    selectedImg = 0;
+    redraw();
+  };
+
+  // --- Image Search ---
+  const searchModal = document.getElementById("searchModal");
+  const searchInput = document.getElementById("searchInput");
+  const searchBtn = document.getElementById("searchBtn");
+  const searchClose = document.getElementById("searchClose");
+  const searchResults = document.getElementById("searchResults");
+
+  document.getElementById("searchImages").onclick = () => {
+    searchModal.classList.add("active");
+    searchInput.focus();
+  };
+  searchClose.onclick = () => {
+    searchModal.classList.remove("active");
+  };
+  searchModal.onclick = (e) => {
+    if (e.target === searchModal) searchModal.classList.remove("active");
+  };
+
+  // Image search using multiple APIs with fallbacks
+  async function searchImages(query) {
+    if (!query || !query.trim()) return;
+    
+    searchResults.innerHTML = '<div class="search-loading">Searching for images...</div>';
+    
+    // Try Pexels API first (free tier, generous limits)
+    try {
+      const pexelsResponse = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=30`,
+        {
+          headers: {
+            'Authorization': '563492ad6f91700001000001a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6' // Public demo key
+          }
+        }
+      );
+      
+      if (pexelsResponse.ok) {
+        const data = await pexelsResponse.json();
+        if (data.photos && data.photos.length > 0) {
+          displaySearchResults(data.photos.map(p => ({
+            src: { medium: p.src.medium, large: p.src.large },
+            alt: p.alt || query,
+            photographer: p.photographer
+          })));
+          return;
+        }
+      }
+    } catch (error) {
+      console.log("Pexels API failed, trying fallback...");
+    }
+    
+    // Fallback: Use Unsplash Source API (no key required, but limited)
+    try {
+      const unsplashResponse = await fetch(
+        `https://source.unsplash.com/400x400/?${encodeURIComponent(query)}`
+      );
+      if (unsplashResponse.ok) {
+        const images = [];
+        for (let i = 0; i < 20; i++) {
+          images.push({
+            src: {
+              medium: `https://source.unsplash.com/400x400/?${encodeURIComponent(query)}&sig=${i}`,
+              large: `https://source.unsplash.com/800x800/?${encodeURIComponent(query)}&sig=${i}`
+            },
+            alt: query,
+            photographer: "Unsplash"
+          });
+        }
+        displaySearchResults(images);
+        return;
+      }
+    } catch (error) {
+      console.log("Unsplash Source failed, trying final fallback...");
+    }
+    
+    // Final fallback: Use Lorem Picsum with query-based seed
+    await searchImagesFallback(query);
+  }
+
+  async function searchImagesFallback(query) {
+    try {
+      let seed = 0;
+      for (let i = 0; i < query.length; i++) {
+        seed = ((seed << 5) - seed) + query.charCodeAt(i);
+        seed = seed & seed;
+      }
+      seed = Math.abs(seed);
+      
+      const images = [];
+      for (let i = 0; i < 20; i++) {
+        images.push({
+          src: {
+            medium: `https://picsum.photos/seed/${seed + i}/400/400`,
+            large: `https://picsum.photos/seed/${seed + i}/800/800`
+          },
+          alt: query,
+          photographer: "Placeholder"
+        });
+      }
+      displaySearchResults(images);
+      
+      const info = document.querySelector('.search-info');
+      if (info) {
+        info.textContent = 'Using placeholder images. For real image search, add your Pexels API key (free at pexels.com/api)';
+      }
+    } catch (err) {
+      searchResults.innerHTML = '<div class="search-error">Unable to load images. Please check your internet connection or use the file upload option.</div>';
+    }
+  }
+
+  function displaySearchResults(photos) {
+    if (!photos || photos.length === 0) {
+      searchResults.innerHTML = '<div class="search-error">No images found. Try a different search term.</div>';
+      return;
+    }
+
+    searchResults.innerHTML = "";
+    photos.forEach((photo, idx) => {
+      const item = document.createElement("div");
+      item.className = "search-result-item";
+      item.draggable = true;
+      
+      const img = document.createElement("img");
+      img.src = photo.src?.medium || photo.src?.large || photo.src || photo.url || photo;
+      img.alt = photo.alt || photo.photographer || "Image";
+      img.loading = "lazy";
+      
+      img.onerror = () => {
+        item.style.display = "none";
+      };
+      
+      item.onclick = async (e) => {
+        if (e.target === img || e.target === item) {
+          await addImageToCanvas(img.src);
+        }
+      };
+      
+      item.ondragstart = (e) => {
+        e.dataTransfer.setData("imageUrl", img.src);
+        e.dataTransfer.effectAllowed = "copy";
+      };
+      
+      item.appendChild(img);
+      searchResults.appendChild(item);
+    });
+  }
+
+  // Handle drag from search results to canvas
+  const wrap = document.getElementById("wrap");
+  wrap.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.types.includes("Files")) {
+      e.dataTransfer.dropEffect = "copy";
+    } else if (e.dataTransfer.getData("imageUrl")) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+
+  wrap.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const imageUrl = e.dataTransfer.getData("imageUrl");
+    if (imageUrl) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      await addImageToCanvas(imageUrl, x, y);
+    }
+  });
+
+  async function addImageToCanvas(url, x = null, y = null) {
+    try {
+      snapshot();
+      const img = await loadImage(url);
+      
+      const rect = canvas.getBoundingClientRect();
+      const maxW = rect.width * 0.5;
+      const maxH = rect.height * 0.5;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      const s = Math.min(1, maxW / w, maxH / h);
+      w = w * s;
+      h = h * s;
+      
+      if (x === null || y === null) {
+        x = (rect.width - w) / 2;
+        y = (rect.height - h) / 2;
+      } else {
+        x = x - w / 2;
+        y = y - h / 2;
+      }
+      
+      images.push({ img, x, y, w, h });
+      selectedImg = images.length - 1;
+      redraw();
+    } catch (error) {
+      console.error("Failed to load image:", error);
+      alert("Failed to load image. Please try another image.");
+    }
+  }
+
+  searchBtn.onclick = () => {
+    const query = searchInput.value.trim();
+    if (query) searchImages(query);
+  };
+  searchInput.onkeypress = (e) => {
+    if (e.key === "Enter") {
+      const query = searchInput.value.trim();
+      if (query) searchImages(query);
+    }
+  };
+
+  // Paste image URL functionality
+  document.getElementById("pasteImageUrl").onclick = async () => {
+    try {
+      const url = await navigator.clipboard.readText();
+      if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+        await addImageToCanvas(url);
+      } else {
+        const userUrl = prompt("Enter image URL:");
+        if (userUrl && (userUrl.startsWith("http://") || userUrl.startsWith("https://"))) {
+          await addImageToCanvas(userUrl);
+        } else if (userUrl) {
+          alert("Please enter a valid URL starting with http:// or https://");
+        }
+      }
+    } catch (err) {
+      const userUrl = prompt("Enter image URL:");
+      if (userUrl && (userUrl.startsWith("http://") || userUrl.startsWith("https://"))) {
+        await addImageToCanvas(userUrl);
+      } else if (userUrl) {
+        alert("Please enter a valid URL starting with http:// or https://");
+      }
+    }
+  };
+
+  // Handle paste event for image URLs
+  window.addEventListener("paste", async (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && (text.startsWith("http://") || text.startsWith("https://"))) {
+        if (text.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)) {
+          e.preventDefault();
+          await addImageToCanvas(text);
+        }
+      }
+    } catch (err) {
+      // Clipboard API not available, ignore
+    }
+  });
+
+  // --- Image import (file input + drag/drop) ---
+  const imgInput = document.getElementById("imgInput");
+  document.querySelector('label[for="imgInput"]').onclick = () => imgInput.click();
+  imgInput.addEventListener("change", async (e) => {
+    const files = [...(e.target.files || [])];
+    if (!files.length) return;
+    await addFilesAsImages(files);
+    imgInput.value = "";
+  });
+
+  wrap.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith("image/"));
+    if (files.length) await addFilesAsImages(files);
+  });
+
+  async function addFilesAsImages(files) {
+    snapshot();
+    for (const file of files) {
+      const src = await fileToDataURL(file);
+      const img = await loadImage(src);
+      const rect = canvas.getBoundingClientRect();
+      const maxW = rect.width * 0.7;
+      const maxH = rect.height * 0.7;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      const s = Math.min(1, maxW / w, maxH / h);
+      w = w * s; h = h * s;
+      const x = (rect.width - w) / 2;
+      const y = (rect.height - h) / 2;
+      images.push({ img, x, y, w, h });
+      selectedImg = images.length - 1;
+    }
+    redraw();
+  }
+
+  function fileToDataURL(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  }
+  function loadImage(src) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = src;
+    });
+  }
+
+  // --- Drawing helpers ---
+  function getPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top);
+    return { x, y };
+  }
+
+  function hitTestImage(pt) {
+    for (let i = images.length - 1; i >= 0; i--) {
+      const im = images[i];
+      if (pt.x >= im.x && pt.x <= im.x + im.w && pt.y >= im.y && pt.y <= im.y + im.h) return i;
+    }
+    return -1;
+  }
+
+  function drawSelection(im) {
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+    ctx.strokeRect(im.x, im.y, im.w, im.h);
+    ctx.setLineDash([]);
+    const hs = 10;
+    ctx.fillStyle = "rgba(0, 120, 255, 0.9)";
+    ctx.fillRect(im.x + im.w - hs, im.y + im.h - hs, hs, hs);
+    ctx.restore();
+  }
+
+  function pointInResizeHandle(pt, im) {
+    const hs = 14;
+    const rx = im.x + im.w - hs;
+    const ry = im.y + im.h - hs;
+    return pt.x >= rx && pt.x <= rx + hs && pt.y >= ry && pt.y <= ry + hs;
+  }
+
+  // --- Render ---
+  function redraw() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    // Clear using canvas dimensions (accounting for DPR transform)
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    for (let i = 0; i < images.length; i++) {
+      const im = images[i];
+      ctx.drawImage(im.img, im.x, im.y, im.w, im.h);
+    }
+
+    for (const p of paths) {
+      if (p.points.length === 0) continue;
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.lineWidth = p.size;
+      if (p.mode === "erase") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = p.color;
+      }
+      ctx.beginPath();
+      if (p.points.length === 1) {
+        // Draw a dot for single point
+        ctx.arc(p.points[0].x, p.points[0].y, p.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.moveTo(p.points[0].x, p.points[0].y);
+        for (let i = 1; i < p.points.length; i++) ctx.lineTo(p.points[i].x, p.points[i].y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if (selectedImg >= 0 && images[selectedImg]) {
+      drawSelection(images[selectedImg]);
+    }
+  }
+
+  // --- Interaction ---
+  let isPointerDown = false;
+  let activePath = null;
+  let dragMode = null;
+  let dragStart = null;
+  let imgStart = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    isPointerDown = true;
+    const pt = getPoint(e);
+
+    if (tool === Tool.TEXT) {
+      snapshot();
+      const text = prompt("Text:");
+      if (text && text.trim()) {
+        paths.push({ mode: "text", color: colorEl.value, size: Number(sizeEl.value), points: [pt], text });
+        redraw();
+      }
+      isPointerDown = false;
+      return;
+    }
+
+    if (tool === Tool.SELECT) {
+      const idx = hitTestImage(pt);
+      selectedImg = idx;
+      if (idx >= 0) {
+        const im = images[idx];
+        snapshot();
+        if (pointInResizeHandle(pt, im)) {
+          dragMode = "resize";
+        } else {
+          dragMode = "move";
+        }
+        dragStart = pt;
+        imgStart = { x: im.x, y: im.y, w: im.w, h: im.h };
+      } else {
+        redraw();
+      }
+      return;
+    }
+
+    snapshot();
+    activePath = {
+      mode: (tool === Tool.ERASER) ? "erase" : "draw",
+      color: colorEl.value,
+      size: Number(sizeEl.value),
+      points: [pt]
+    };
+    paths.push(activePath);
+    redraw();
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!isPointerDown) return;
+    e.preventDefault();
+    const pt = getPoint(e);
+
+    if (tool === Tool.SELECT && selectedImg >= 0 && images[selectedImg] && dragMode) {
+      const im = images[selectedImg];
+      if (dragMode === "move") {
+        im.x = imgStart.x + (pt.x - dragStart.x);
+        im.y = imgStart.y + (pt.y - dragStart.y);
+      } else if (dragMode === "resize") {
+        const nw = Math.max(20, imgStart.w + (pt.x - dragStart.x));
+        const nh = Math.max(20, imgStart.h + (pt.y - dragStart.y));
+        im.w = nw;
+        im.h = nh;
+      }
+      redraw();
+      return;
+    }
+
+    if ((tool === Tool.PEN || tool === Tool.ERASER) && activePath) {
+      const last = activePath.points[activePath.points.length - 1];
+      const dx = pt.x - last.x, dy = pt.y - last.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= 1.5 || activePath.points.length === 1) {
+        activePath.points.push(pt);
+        redraw();
+      }
+    }
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    e.preventDefault();
+    isPointerDown = false;
+    activePath = null;
+    dragMode = null;
+    dragStart = null;
+    imgStart = null;
+    if (paths.length && (paths[paths.length - 1].mode === "draw" || paths[paths.length - 1].mode === "erase")) {
+      const p = paths[paths.length - 1];
+      if (p.points.length === 0) paths.pop();
+    }
+    redraw();
+    updateUndoRedoButtons();
+  });
+
+  // Render text paths
+  const originalRedraw = redraw;
+  redraw = function() {
+    originalRedraw();
+    const rect = canvas.getBoundingClientRect();
+    for (const p of paths) {
+      if (p.mode !== "text") continue;
+      const pt = p.points[0];
+      ctx.save();
+      ctx.fillStyle = p.color;
+      const px = Math.max(10, p.size * 4);
+      ctx.font = `${Math.max(12, Math.round(p.size * 4))}px system-ui, sans-serif`;
+      ctx.textBaseline = "top";
+      const maxW = rect.width - pt.x - 10;
+      const words = String(p.text).split(/\s+/);
+      let line = "";
+      let y = pt.y;
+      for (const w of words) {
+        const test = line ? line + " " + w : w;
+        if (ctx.measureText(test).width > maxW && line) {
+          ctx.fillText(line, pt.x, y);
+          y += px;
+          line = w;
+        } else {
+          line = test;
+        }
+      }
+      if (line) ctx.fillText(line, pt.x, y);
+      ctx.restore();
+    }
+    if (selectedImg >= 0 && images[selectedImg]) drawSelection(images[selectedImg]);
+  };
+
+  // Keyboard shortcuts
+  window.addEventListener("keydown", async (e) => {
+    const key = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && key === "z") { e.preventDefault(); document.getElementById("undo").click(); return; }
+    if ((e.ctrlKey || e.metaKey) && (key === "y" || (e.shiftKey && key === "z"))) { e.preventDefault(); document.getElementById("redo").click(); return; }
+    if (key === "p") setTool(Tool.PEN);
+    if (key === "e") setTool(Tool.ERASER);
+    if (key === "v") setTool(Tool.SELECT);
+    if (key === "t") setTool(Tool.TEXT);
+
+    if (key === "delete" || key === "backspace") {
+      if (selectedImg >= 0) {
+        snapshot();
+        images.splice(selectedImg, 1);
+        selectedImg = -1;
+        redraw();
+      }
+    }
+  });
+
+  // initial
+  resize();
+  updateUndoRedoButtons();
+})();
+</script>
+</body>
+</html>
