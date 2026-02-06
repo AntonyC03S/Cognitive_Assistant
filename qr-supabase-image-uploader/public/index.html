@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QR → Upload → Supabase → Display</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>QR → Upload → Supabase → Display</h1>
+
+      <section class="panel">
+        <button id="makeQrBtn" class="button">Generate QR</button>
+        <div id="status" class="status"></div>
+
+        <div class="qrRow">
+          <div>
+            <div id="qr" class="qrBox"></div>
+            <a id="uploadLink" href="#" target="_blank" rel="noreferrer" class="link"></a>
+          </div>
+
+          <div class="preview">
+            <div class="previewTitle">Latest uploaded image</div>
+            <img id="resultImg" alt="Uploaded will appear here" />
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>
