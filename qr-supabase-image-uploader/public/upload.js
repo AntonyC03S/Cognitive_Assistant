@@ -6,9 +6,7 @@ const form = document.getElementById("uploadForm");
 const fileInput = document.getElementById("fileInput");
 const previewImg = document.getElementById("previewImg");
 
-function setStatus(text) {
-  statusDiv.textContent = text || "";
-}
+function setStatus(t) { statusDiv.textContent = t || ""; }
 
 if (!sessionId) {
   setStatus("Missing session id. Re-scan the QR code.");
@@ -40,11 +38,10 @@ form.addEventListener("submit", async (e) => {
       body: fd
     });
 
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return setStatus(data.error || "Upload failed.");
 
-    if (!resp.ok) return setStatus(data?.error || "Upload failed.");
-
-    setStatus("Upload complete. The other screen should update.");
+    setStatus("Upload complete. You can close this page.");
   } catch {
     setStatus("Upload failed (network/server error).");
   }

@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import express from "express";
+import cookieParser from "cookie-parser";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 
@@ -16,57 +17,143 @@ const app = express();
 app.set("trust proxy", true);
 
 const PORT = process.env.PORT || 3000;
-
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY; // safe to send to browser
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // SERVER ONLY
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BUCKET = process.env.SUPABASE_BUCKET || "uploads";
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Missing env vars. Check .env (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).");
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SESSION_SECRET) {
+  console.error("Missing env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SESSION_SECRET");
   process.exit(1);
 }
 
-// Admin client (uses secret/service_role; bypasses RLS; keep it private)
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Serve frontend
+app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Browser needs URL + anon key (safe to expose with RLS)
-app.get("/api/supabase-config", (_req, res) => {
-  res.json({ supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY });
-});
+// -------------------- Simple cookie session (server-side validation) --------------------
+// Cookie holds a signed payload: base64(json) + HMAC signature.
+// This avoids storing sessions in memory for the demo.
+function hmac(data) {
+  return crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("hex");
+}
 
+function setSessionCookie(res, payloadObj) {
+  const payload = Buffer.from(JSON.stringify(payloadObj), "utf8").toString("base64url");
+  const sig = hmac(payload);
+  const value = `${payload}.${sig}`;
+
+  res.cookie("sid", value, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false, // set true if you are on HTTPS in production
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+}
+
+function clearSessionCookie(res) {
+  res.clearCookie("sid");
+}
+
+function getSession(req) {
+  const raw = req.cookies?.sid;
+  if (!raw) return null;
+
+  const parts = raw.split(".");
+  if (parts.length !== 2) return null;
+
+  const [payload, sig] = parts;
+  if (hmac(payload) !== sig) return null;
+
+  try {
+    const obj = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!obj?.userId) return null;
+    return obj;
+  } catch {
+    return null;
+  }
+}
+
+function requireLogin(req, res) {
+  const s = getSession(req);
+  if (!s) {
+    res.status(401).json({ error: "Not logged in" });
+    return null;
+  }
+  return s;
+}
+
+// -------------------- Password hashing --------------------
+// Use scrypt (built-in) with per-user salt.
+function hashPassword(password, saltHex) {
+  const salt = Buffer.from(saltHex, "hex");
+  const derived = crypto.scryptSync(password, salt, 64);
+  return derived.toString("hex");
+}
+
+function newSaltHex() {
+  return crypto.randomBytes(16).toString("hex");
+}
+
+// Store hash as: saltHex:hashHex
+function makeStoredHash(password) {
+  const saltHex = newSaltHex();
+  const hashHex = hashPassword(password, saltHex);
+  return `${saltHex}:${hashHex}`;
+}
+
+function verifyPassword(password, stored) {
+  const [saltHex, hashHex] = (stored || "").split(":");
+  if (!saltHex || !hashHex) return false;
+  const computed = hashPassword(password, saltHex);
+  return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(hashHex, "hex"));
+}
+
+// -------------------- SSE for realtime updates --------------------
+const sessionStreams = new Map(); // sessionId -> Set<res>
+const userStreams = new Map();    // userId -> Set<res>
+
+function sseInit(res) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive"
+  });
+  res.write("event: ping\ndata: {}\n\n");
+}
+
+function sseSend(res, event, data) {
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function addStream(map, key, res) {
+  if (!map.has(key)) map.set(key, new Set());
+  map.get(key).add(res);
+}
+
+function removeStream(map, key, res) {
+  const set = map.get(key);
+  if (!set) return;
+  set.delete(res);
+  if (set.size === 0) map.delete(key);
+}
+
+function broadcast(map, key, event, data) {
+  const set = map.get(key);
+  if (!set) return;
+  for (const res of set) sseSend(res, event, data);
+}
+
+// -------------------- Helpers --------------------
 function getPublicBaseUrl(req) {
-  // Optional override for QR links if you deploy behind a domain/tunnel
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, "");
-
   const proto = req.headers["x-forwarded-proto"] || req.protocol;
   const host = req.headers["x-forwarded-host"] || req.get("host");
   return `${proto}://${host}`;
 }
-
-// Create a session row in DB and return a phone upload URL for the QR code
-app.get("/api/session", async (req, res) => {
-  const sessionId = crypto.randomUUID();
-
-  const { error } = await supabaseAdmin.from("sessions").insert({ id: sessionId });
-  if (error) return res.status(500).json({ error: error.message });
-
-  const uploadUrl = `${getPublicBaseUrl(req)}/upload.html?session=${encodeURIComponent(sessionId)}`;
-  res.json({ sessionId, uploadUrl });
-});
-
-// Multer: keep file in memory, then push to Supabase Storage
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 6 * 1024 * 1024 }, // 6MB
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype && file.mimetype.startsWith("image/")) return cb(null, true);
-    cb(new Error("Only image uploads are allowed."));
-  }
-});
 
 function safeExtFromMime(mime) {
   switch (mime) {
@@ -80,21 +167,134 @@ function safeExtFromMime(mime) {
   }
 }
 
+// -------------------- Auth API (username + password) --------------------
+app.post("/api/signup", async (req, res) => {
+  const username = String(req.body?.username || "").trim();
+  const password = String(req.body?.password || "");
+
+  if (username.length < 3) return res.status(400).json({ error: "Username must be at least 3 characters" });
+  if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+
+  const storedHash = makeStoredHash(password);
+
+  const { data, error } = await supabaseAdmin
+    .from("app_users")
+    .insert({ username, password_hash: storedHash })
+    .select("id, username")
+    .single();
+
+  if (error) {
+    const msg = (error.message || "").includes("duplicate") ? "Username already taken" : error.message;
+    return res.status(400).json({ error: msg });
+  }
+
+  setSessionCookie(res, { userId: data.id, username: data.username });
+  res.json({ ok: true, user: { id: data.id, username: data.username } });
+});
+
+app.post("/api/login", async (req, res) => {
+  const username = String(req.body?.username || "").trim();
+  const password = String(req.body?.password || "");
+
+  const { data, error } = await supabaseAdmin
+    .from("app_users")
+    .select("id, username, password_hash")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(400).json({ error: "Invalid username or password" });
+
+  if (!verifyPassword(password, data.password_hash)) {
+    return res.status(400).json({ error: "Invalid username or password" });
+  }
+
+  setSessionCookie(res, { userId: data.id, username: data.username });
+  res.json({ ok: true, user: { id: data.id, username: data.username } });
+});
+
+app.post("/api/logout", (req, res) => {
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.get("/api/me", (req, res) => {
+  const s = getSession(req);
+  if (!s) return res.json({ user: null });
+  res.json({ user: { id: s.userId, username: s.username } });
+});
+
+// -------------------- Session + QR --------------------
+app.get("/api/session", async (req, res) => {
+  const s = requireLogin(req, res);
+  if (!s) return;
+
+  const sessionId = crypto.randomUUID();
+
+  const { error } = await supabaseAdmin.from("sessions").insert({
+    id: sessionId,
+    user_id: s.userId
+  });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const uploadUrl = `${getPublicBaseUrl(req)}/upload.html?session=${encodeURIComponent(sessionId)}`;
+  res.json({ sessionId, uploadUrl });
+});
+
+// SSE: desktop listens for new upload in the current session
+app.get("/api/stream/session/:sessionId", (req, res) => {
+  const s = requireLogin(req, res);
+  if (!s) return;
+
+  const sessionId = req.params.sessionId;
+  sseInit(res);
+
+  addStream(sessionStreams, sessionId, res);
+
+  req.on("close", () => {
+    removeStream(sessionStreams, sessionId, res);
+  });
+});
+
+// SSE: gallery listens for new uploads for the user
+app.get("/api/stream/user", (req, res) => {
+  const s = requireLogin(req, res);
+  if (!s) return;
+
+  sseInit(res);
+  addStream(userStreams, s.userId, res);
+
+  req.on("close", () => {
+    removeStream(userStreams, s.userId, res);
+  });
+});
+
+// -------------------- Upload endpoint (phone) --------------------
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 6 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith("image/")) return cb(null, true);
+    cb(new Error("Only image uploads are allowed."));
+  }
+});
+
 app.post("/api/upload/:sessionId", upload.single("image"), async (req, res) => {
   try {
     const sessionId = req.params.sessionId;
 
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    // Confirm session exists
-    const { data: s, error: sErr } = await supabaseAdmin
+    // session -> user_id
+    const { data: sess, error: sErr } = await supabaseAdmin
       .from("sessions")
-      .select("id")
+      .select("id, user_id")
       .eq("id", sessionId)
       .maybeSingle();
 
     if (sErr) return res.status(500).json({ error: sErr.message });
-    if (!s) return res.status(404).json({ error: "Session not found" });
+    if (!sess) return res.status(404).json({ error: "Session not found" });
 
     const ext =
       safeExtFromMime(req.file.mimetype) ||
@@ -102,9 +302,9 @@ app.post("/api/upload/:sessionId", upload.single("image"), async (req, res) => {
         ? path.extname(req.file.originalname)
         : "");
 
-    const objectPath = `${sessionId}/${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`;
+    const objectPath = `${sess.user_id}/${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`;
 
-    // Upload image bytes to Storage
+    // Upload to Storage
     const { error: upErr } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(objectPath, req.file.buffer, {
@@ -114,27 +314,51 @@ app.post("/api/upload/:sessionId", upload.single("image"), async (req, res) => {
 
     if (upErr) return res.status(500).json({ error: upErr.message });
 
-    // Get public URL (bucket must be public)
     const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectPath);
     const publicUrl = urlData.publicUrl;
 
-    // Insert metadata into DB (desktop listens to this table)
-    const { error: dbErr } = await supabaseAdmin.from("uploads").insert({
-      session_id: sessionId,
-      object_path: objectPath,
-      public_url: publicUrl,
-      mime_type: req.file.mimetype
-    });
+    // Insert metadata
+    const { data: row, error: dbErr } = await supabaseAdmin
+      .from("uploads")
+      .insert({
+        user_id: sess.user_id,
+        session_id: sessionId,
+        object_path: objectPath,
+        public_url: publicUrl,
+        mime_type: req.file.mimetype
+      })
+      .select("id, public_url, created_at, session_id")
+      .single();
 
     if (dbErr) return res.status(500).json({ error: dbErr.message });
 
-    res.json({ ok: true, sessionId, publicUrl });
+    // Notify connected desktop clients
+    broadcast(sessionStreams, sessionId, "image", { publicUrl: row.public_url, createdAt: row.created_at });
+    broadcast(userStreams, sess.user_id, "image", { publicUrl: row.public_url, createdAt: row.created_at });
+
+    res.json({ ok: true, publicUrl });
   } catch (e) {
     res.status(500).json({ error: e?.message || "Upload failed" });
   }
 });
 
-// Multer errors -> JSON
+// Gallery API: list user's uploads
+app.get("/api/my-uploads", async (req, res) => {
+  const s = requireLogin(req, res);
+  if (!s) return;
+
+  const { data, error } = await supabaseAdmin
+    .from("uploads")
+    .select("id, public_url, created_at")
+    .eq("user_id", s.userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ uploads: data });
+});
+
+// Multer errors
 app.use((err, _req, res, _next) => {
   res.status(400).json({ error: err?.message || "Bad request" });
 });
