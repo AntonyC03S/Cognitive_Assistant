@@ -91,3 +91,24 @@ h2 { margin: 0 0 10px; font-size: 18px; }
 
 .consentText { margin: 0; font-size: 14px; color: #111; line-height: 1.5; }
 .consentActions { margin-top: 14px; }
+
+.timerBox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+.timerLabel {
+  font-size: 12px;
+  color: #374151;
+}
+.timerText {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: #111;
+  min-width: 48px;
+  text-align: right;
+}

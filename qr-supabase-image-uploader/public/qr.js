@@ -1,4 +1,5 @@
 import { api, initTopbar, hasConsent } from "/common.js";
+import { initCountdownTimer } from "/timer.js";
 
 const makeQrBtn = document.getElementById("makeQrBtn");
 const qrDiv = document.getElementById("qr");
@@ -29,6 +30,8 @@ function setImage(url) {
     window.location.href = "/consent.html";
     return;
   }
+
+  initCountdownTimer();
 })();
 
 makeQrBtn.addEventListener("click", async () => {
