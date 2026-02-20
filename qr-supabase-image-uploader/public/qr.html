@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QR Upload</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><a href="/qr.html">QR Uploader</a></div>
+      <div class="authControls">
+        <a class="link" href="/gallery.html">My uploads</a>
+        <span id="userLabel" class="userLabel"></span>
+        <a id="loginLink" class="link" href="/login.html">Log in</a>
+        <button id="logoutBtn" class="button small secondary">Log out</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <h1>QR Upload</h1>
+
+      <section class="panel">
+        <button id="makeQrBtn" class="button">Generate QR</button>
+        <div id="status" class="status"></div>
+
+        <div class="qrRow">
+          <div>
+            <div id="qr" class="qrBox"></div>
+            <a id="uploadLink" class="link" href="#" target="_blank" rel="noreferrer"></a>
+          </div>
+
+          <div class="preview">
+            <div class="previewTitle">Latest uploaded image (this session)</div>
+            <img id="resultImg" alt="Uploaded will appear here" />
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script type="module" src="/qr.js"></script>
+  </body>
+</html>

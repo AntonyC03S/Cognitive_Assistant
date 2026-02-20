@@ -1,6 +1,7 @@
+import { api, initTopbar } from "/common.js";
+
 const statusEl = document.getElementById("status");
 const gridEl = document.getElementById("grid");
-const logoutBtn = document.getElementById("logoutBtn");
 
 let evtSource = null;
 
@@ -29,17 +30,6 @@ function renderItem(row, prepend = false) {
   else gridEl.appendChild(card);
 }
 
-async function api(path, method, body) {
-  const resp = await fetch(path, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(data.error || "Request failed");
-  return data;
-}
-
 async function load() {
   setStatus("Loading...");
   const data = await api("/api/my-uploads", "GET");
@@ -48,13 +38,9 @@ async function load() {
   setStatus(`Loaded ${data.uploads.length} uploads.`);
 }
 
-logoutBtn.addEventListener("click", async () => {
-  await api("/api/logout", "POST");
-  if (evtSource) evtSource.close();
-  window.location.href = "/";
-});
-
 (async function init() {
+  await initTopbar({ requireAuth: true });
+
   try {
     await load();
 
@@ -64,9 +50,7 @@ logoutBtn.addEventListener("click", async () => {
       renderItem({ public_url: row.publicUrl, created_at: row.createdAt }, true);
     });
   } catch (e) {
-    // If not logged in, server returns 401 and this shows error
     setStatus(e.message);
-    // send back to login page
-    window.location.href = "/";
+    window.location.href = "/login.html";
   }
 })();

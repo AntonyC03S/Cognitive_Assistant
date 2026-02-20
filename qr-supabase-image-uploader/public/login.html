@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>My uploads</title>
+    <title>Login</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <div class="brand"><a href="/qr.html">QR Uploader</a></div>
+      <div class="brand"><a href="/login.html">QR Uploader</a></div>
       <div class="authControls">
         <span id="userLabel" class="userLabel"></span>
         <a id="loginLink" class="link" href="/login.html">Log in</a>
@@ -17,20 +17,21 @@
     </header>
 
     <main class="container">
-      <h1>My uploads</h1>
+      <h1>Login</h1>
 
       <section class="panel">
         <div id="status" class="status"></div>
-        <div class="linksRow">
-          <a class="link" href="/qr.html">← Back</a>
-        </div>
-      </section>
 
-      <section class="panel" style="margin-top:16px;">
-        <div id="grid" class="grid"></div>
+        <div class="authGrid">
+          <input id="username" class="input" placeholder="username / id" autocomplete="username" />
+          <input id="password" class="input" type="password" placeholder="password" autocomplete="current-password" />
+
+          <button id="signupBtn" class="button">Sign up</button>
+          <button id="loginBtn" class="button">Log in</button>
+        </div>
       </section>
     </main>
 
-    <script type="module" src="/gallery.js"></script>
+    <script type="module" src="/login.js"></script>
   </body>
 </html>
