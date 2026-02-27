@@ -8,17 +8,20 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="brand"><a href="/qr.html">QR Uploader</a></div>
+      <div class="topbarLeft">
+        <div class="brand"><a href="/qr.html">QR Uploader</a></div>
+      </div>
 
-      <div class="authControls">
-        <a class="link" href="/gallery.html">My uploads</a>
-
-        <div class="timerBox">
-          <span class="timerLabel">Timer</span>
-          <span id="timerText" class="timerText">30:00</span>
+      <div class="topbarCenter">
+        <div class="timerBig">
+          <span id="timerText" class="timerBigText">30:00</span>
           <button id="pauseBtn" class="button small secondary">Pause</button>
+          <button id="endBtn" class="button small danger">End</button>
         </div>
+      </div>
 
+      <div class="topbarRight authControls">
+        <a class="link" href="/gallery.html">My uploads</a>
         <span id="userLabel" class="userLabel"></span>
         <a id="loginLink" class="link" href="/login.html">Log in</a>
         <button id="logoutBtn" class="button small secondary">Log out</button>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tutorial</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbarLeft">
+        <div class="brand"><a href="/tutorial.html">QR Uploader</a></div>
+      </div>
+
+      <div class="topbarCenter"></div>
+
+      <div class="topbarRight authControls">
+        <span id="userLabel" class="userLabel"></span>
+        <a id="loginLink" class="link" href="/login.html">Log in</a>
+        <button id="logoutBtn" class="button small secondary">Log out</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <h1>Tutorial</h1>
+
+      <section class="panel">
+        <ol class="tutorialList">
+          <li>On the next page, click <b>Generate QR</b>.</li>
+          <li>Scan the QR code with your phone camera.</li>
+          <li>On your phone, choose an image and tap <b>Upload</b>.</li>
+          <li>The image will appear on the QR page automatically.</li>
+          <li>You can view all images in <b>My uploads</b>.</li>
+          <li>The center timer counts down from <b>30:00</b>. You can pause it.</li>
+          <li>When it hits <b>00:00</b> (or you click <b>End</b>), you will be logged out and taken to the ending screen.</li>
+        </ol>
+
+        <div class="tutorialActions">
+          <button id="continueBtn" class="button">Continue</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/tutorial.js"></script>
+  </body>
+</html>

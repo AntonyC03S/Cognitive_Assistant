@@ -1,4 +1,4 @@
-import { api, initTopbar, hasConsent } from "/common.js";
+import { api, initTopbar, hasConsent, hasTutorial } from "/common.js";
 import { initCountdownTimer } from "/timer.js";
 
 const makeQrBtn = document.getElementById("makeQrBtn");
@@ -30,6 +30,10 @@ function setImage(url) {
     window.location.href = "/consent.html";
     return;
   }
+  if (!hasTutorial()) {
+    window.location.href = "/tutorial.html";
+    return;
+  }
 
   initCountdownTimer();
 })();
@@ -59,7 +63,6 @@ makeQrBtn.addEventListener("click", async () => {
     });
 
     evtSource.addEventListener("error", () => {
-      // happens if session expires or you get logged out
       setStatus("Live updates disconnected (reload page if needed).");
     });
   } catch (e) {

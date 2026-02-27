@@ -1,4 +1,4 @@
-import { api, initTopbar, clearConsent, hasConsent } from "/common.js";
+import { api, initTopbar, clearFlowFlags, hasConsent, hasTutorial } from "/common.js";
 
 const statusEl = document.getElementById("status");
 const usernameEl = document.getElementById("username");
@@ -9,16 +9,21 @@ const loginBtn = document.getElementById("loginBtn");
 
 function setStatus(t) { statusEl.textContent = t || ""; }
 
+function routeAfterLogin() {
+  if (!hasConsent()) return "/consent.html";
+  if (!hasTutorial()) return "/tutorial.html";
+  return "/qr.html";
+}
+
 (async function init() {
   const { user } = await initTopbar({ requireAuth: false });
 
-  // If already logged in, skip login screen
   if (user) {
-    window.location.href = hasConsent() ? "/qr.html" : "/consent.html";
+    window.location.href = routeAfterLogin();
     return;
   }
 
-  clearConsent(); // force consent again after a new login
+  clearFlowFlags();
 })();
 
 signupBtn.addEventListener("click", async () => {
@@ -28,7 +33,7 @@ signupBtn.addEventListener("click", async () => {
       username: usernameEl.value.trim(),
       password: passwordEl.value
     });
-    clearConsent();
+    clearFlowFlags();
     window.location.href = "/consent.html";
   } catch (e) {
     setStatus(e.message);
@@ -42,7 +47,7 @@ loginBtn.addEventListener("click", async () => {
       username: usernameEl.value.trim(),
       password: passwordEl.value
     });
-    clearConsent();
+    clearFlowFlags();
     window.location.href = "/consent.html";
   } catch (e) {
     setStatus(e.message);

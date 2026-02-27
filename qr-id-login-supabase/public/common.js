@@ -9,16 +9,26 @@ export async function api(path, method = "GET", body) {
   return data;
 }
 
-export function clearConsent() {
-  sessionStorage.removeItem("consentAccepted");
+const CONSENT_KEY = "consentAccepted";
+const TUTORIAL_KEY = "tutorialCompleted";
+
+export function clearFlowFlags() {
+  sessionStorage.removeItem(CONSENT_KEY);
+  sessionStorage.removeItem(TUTORIAL_KEY);
 }
 
 export function hasConsent() {
-  return sessionStorage.getItem("consentAccepted") === "1";
+  return sessionStorage.getItem(CONSENT_KEY) === "1";
+}
+export function setConsent() {
+  sessionStorage.setItem(CONSENT_KEY, "1");
 }
 
-export function setConsent() {
-  sessionStorage.setItem("consentAccepted", "1");
+export function hasTutorial() {
+  return sessionStorage.getItem(TUTORIAL_KEY) === "1";
+}
+export function setTutorial() {
+  sessionStorage.setItem(TUTORIAL_KEY, "1");
 }
 
 export async function initTopbar({ requireAuth = false } = {}) {
@@ -49,7 +59,7 @@ export async function initTopbar({ requireAuth = false } = {}) {
     try {
       await api("/api/logout", "POST");
     } finally {
-      clearConsent();
+      clearFlowFlags();
       window.location.href = "/login.html";
     }
   });

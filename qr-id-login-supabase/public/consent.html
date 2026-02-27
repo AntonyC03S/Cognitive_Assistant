@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Consent</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbarLeft">
+        <div class="brand"><a href="/login.html">QR Uploader</a></div>
+      </div>
+
+      <div class="topbarCenter"></div>
+
+      <div class="topbarRight authControls">
+        <span id="userLabel" class="userLabel"></span>
+        <a id="loginLink" class="link" href="/login.html">Log in</a>
+        <button id="logoutBtn" class="button small secondary">Log out</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <h1>Consent</h1>
+
+      <section class="panel">
+        <p class="consentText">
+          By clicking OK, you agree you are uploading images you have the right to upload and that you understand
+          the images will be stored and displayed in your account.
+        </p>
+
+        <div class="consentActions">
+          <button id="okBtn" class="button">OK</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/consent.js"></script>
+  </body>
+</html>

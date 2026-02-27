@@ -1,0 +1,95 @@
+/* Topbar layout: left / center / right */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.topbarLeft { justify-self: start; }
+.topbarCenter { justify-self: center; }
+.topbarRight { justify-self: end; }
+
+.brand a {
+  text-decoration: none;
+  color: #111;
+  font-weight: 700;
+}
+
+.authControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.userLabel {
+  font-size: 13px;
+  color: #374151;
+}
+
+/* Big centered timer */
+.timerBig {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fafafa;
+}
+
+.timerBigText {
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  min-width: 86px;
+  text-align: center;
+}
+
+/* Buttons */
+.button.small {
+  margin-top: 0;
+  padding: 7px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+.button.danger {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* Tutorial/ending */
+.tutorialList {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.tutorialActions { margin-top: 14px; }
+
+.endingPanel { text-align: center; }
+.endingArt {
+  width: 72px;
+  height: 72px;
+  margin: 6px auto 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  font-weight: 800;
+  background: #fafafa;
+}
+.endingText { margin: 0; font-size: 14px; }
+.endingActions { margin-top: 14px; }

@@ -1,15 +1,10 @@
-import { api, clearConsent } from "/common.js";
+import { api, clearFlowFlags } from "/common.js";
 
-const STORAGE_KEY = "qrCountdownState_v1";
-const DURATION_MS = 10000;//30 * 60 * 1000;
+const STORAGE_KEY = "qrCountdownState_v2";
+const DURATION_MS = 30 * 60 * 1000;
 
-function now() {
-  return Date.now();
-}
-
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
+function now() { return Date.now(); }
+function pad2(n) { return String(n).padStart(2, "0"); }
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -33,7 +28,6 @@ function saveState(state) {
 }
 
 function newState() {
-  // deadline is an absolute timestamp; pause stores remaining_ms
   return {
     running: true,
     deadline: now() + DURATION_MS,
@@ -41,22 +35,23 @@ function newState() {
   };
 }
 
-async function doLogout() {
+async function endToEndingScreen() {
   try {
     await api("/api/logout", "POST");
   } catch {
     // ignore
   }
-  clearConsent();
+  clearFlowFlags();
   sessionStorage.removeItem(STORAGE_KEY);
-  window.location.href = "/login.html";
+  window.location.href = "/ending.html";
 }
 
 export function initCountdownTimer() {
   const timerText = document.getElementById("timerText");
   const pauseBtn = document.getElementById("pauseBtn");
+  const endBtn = document.getElementById("endBtn");
 
-  if (!timerText || !pauseBtn) return;
+  if (!timerText || !pauseBtn || !endBtn) return;
 
   let state = loadState();
   if (!state) {
@@ -64,43 +59,42 @@ export function initCountdownTimer() {
     saveState(state);
   }
 
-  function getRemainingMs() {
-    if (state.running) {
-      return state.deadline - now();
-    }
-    return state.remaining_ms;
+  function remainingMs() {
+    return state.running ? (state.deadline - now()) : state.remaining_ms;
+  }
+
+  function setButtons() {
+    pauseBtn.textContent = state.running ? "Pause" : "Resume";
   }
 
   function render() {
-    const remaining = getRemainingMs();
-    timerText.textContent = fmt(remaining);
+    const rem = remainingMs();
+    timerText.textContent = fmt(rem);
 
-    if (remaining <= 0) {
-      doLogout();
+    if (rem <= 0) {
+      endToEndingScreen();
       return;
     }
   }
 
-  function setButton() {
-    pauseBtn.textContent = state.running ? "Pause" : "Resume";
-  }
-
   pauseBtn.addEventListener("click", () => {
     if (state.running) {
-      // pause
       state.remaining_ms = Math.max(0, state.deadline - now());
       state.running = false;
     } else {
-      // resume
       state.running = true;
       state.deadline = now() + Math.max(0, state.remaining_ms);
     }
     saveState(state);
-    setButton();
+    setButtons();
     render();
   });
 
-  // If user manually logs out, stop/clear timer
+  endBtn.addEventListener("click", () => {
+    endToEndingScreen();
+  });
+
+  // If user logs out manually, clear timer state
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
@@ -108,17 +102,14 @@ export function initCountdownTimer() {
     });
   }
 
-  setButton();
+  setButtons();
   render();
 
-  // Tick every 250ms for smoothness, but only update text every tick anyway
   const interval = setInterval(render, 250);
 
-  // If the tab is hidden and comes back, render immediately
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) render();
   });
 
-  // Return a cleanup if needed
   return () => clearInterval(interval);
 }

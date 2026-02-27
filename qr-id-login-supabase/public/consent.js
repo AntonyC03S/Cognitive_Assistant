@@ -8,5 +8,5 @@ const okBtn = document.getElementById("okBtn");
 
 okBtn.addEventListener("click", () => {
   setConsent();
-  window.location.href = "/qr.html";
+  window.location.href = "/tutorial.html";
 });
