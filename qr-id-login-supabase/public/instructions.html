@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Instructions</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbarLeft">
+        <div class="brand"><a href="/qr.html">QR Uploader</a></div>
+      </div>
+
+      <div class="topbarCenter"></div>
+
+      <div class="topbarRight authControls">
+        <a class="link" href="/qr.html">QR</a>
+        <a class="link" href="/gallery.html">My uploads</a>
+        <span id="userLabel" class="userLabel"></span>
+        <a id="loginLink" class="link" href="/login.html">Log in</a>
+        <button id="logoutBtn" class="button small secondary">Log out</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <h1>Instructions</h1>
+
+      <section class="panel">
+        <h2>Using the QR upload</h2>
+        <ol class="tutorialList">
+          <li>Log in.</li>
+          <li>Accept consent.</li>
+          <li>On the QR page, click <b>Generate QR</b>.</li>
+          <li>Scan the QR code with your phone.</li>
+          <li>Pick an image and press <b>Upload</b>.</li>
+          <li>The image appears on the QR page and in <b>My uploads</b>.</li>
+        </ol>
+
+        <h2 style="margin-top:16px;">Timer</h2>
+        <ul class="tutorialList">
+          <li>The session timer starts at <b>30:00</b>.</li>
+          <li><b>Pause</b> freezes it. <b>Resume</b> continues it.</li>
+          <li><b>End</b> logs you out and takes you to the ending screen.</li>
+          <li>When the timer hits <b>00:00</b>, it automatically ends the session.</li>
+        </ul>
+
+        <h2 style="margin-top:16px;">Troubleshooting</h2>
+        <ul class="tutorialList">
+          <li>If your phone can’t open the QR link, you are likely using <b>localhost</b>. Use a tunnel or deploy.</li>
+          <li>If uploads succeed but don’t show, refresh the QR page and confirm you’re logged in.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module" src="/instructions.js"></script>
+  </body>
+</html>

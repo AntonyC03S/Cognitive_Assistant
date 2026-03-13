@@ -224,3 +224,87 @@ h2 { margin: 0 0 10px; font-size: 18px; }
 }
 .endingText { margin: 0; font-size: 14px; }
 .endingActions { margin-top: 14px; }
+
+
+/* Bigger centered timer */
+.timerBigText {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  min-width: 110px;
+}
+
+/* Tour overlay */
+.tourRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: auto;
+}
+
+.tourHole {
+  position: fixed;
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.65);
+  transition: left 120ms ease, top 120ms ease, width 120ms ease, height 120ms ease;
+  pointer-events: none;
+}
+
+.tourCard {
+  position: fixed;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+
+.tourTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tourTitle {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.tourX {
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  color: #111;
+}
+
+.tourBody {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #111;
+}
+
+.tourBottom {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tourStepText {
+  font-size: 12px;
+  color: #374151;
+}
+
+.tourBtns {
+  display: inline-flex;
+  gap: 8px;
+}

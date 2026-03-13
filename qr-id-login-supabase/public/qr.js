@@ -1,5 +1,6 @@
-import { api, initTopbar, hasConsent, hasTutorial } from "/common.js";
+import { api, initTopbar, hasConsent, hasTutorial, setTutorial } from "/common.js";
 import { initCountdownTimer } from "/timer.js";
+import { startTour } from "/tour.js";
 
 const makeQrBtn = document.getElementById("makeQrBtn");
 const qrDiv = document.getElementById("qr");
@@ -23,6 +24,61 @@ function setImage(url) {
   resultImg.src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
 }
 
+function runTour(timerCtrl) {
+  const steps = [
+    {
+      selector: ".timerBig",
+      title: "Session timer",
+      body: "This counts down from 30 minutes. Pause/Resume stops the countdown. End ends the session immediately."
+    },
+    {
+      selector: "#makeQrBtn",
+      title: "Generate QR",
+      body: "Click this to create a new upload session and generate a QR code."
+    },
+    {
+      selector: "#qr",
+      title: "QR code",
+      body: "Scan this on your phone to open the upload page."
+    },
+    {
+      selector: "#uploadLink",
+      title: "Upload link",
+      body: "This is the same link as the QR code (useful for testing)."
+    },
+    {
+      selector: "#resultImg",
+      title: "Preview area",
+      body: "After you upload on your phone, the latest image for this session appears here automatically."
+    },
+    {
+      selector: ".topbarRight",
+      title: "Navigation + account",
+      body: "Use My uploads to see your full gallery. Use Log out to end your login session."
+    }
+  ];
+
+  timerCtrl?.pause?.();
+
+  startTour({
+    steps,
+    onFinish: () => {
+      setTutorial();
+      timerCtrl?.resume?.();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("tour");
+      history.replaceState({}, "", url.pathname);
+    },
+    onSkip: () => {
+      setTutorial();
+      timerCtrl?.resume?.();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("tour");
+      history.replaceState({}, "", url.pathname);
+    }
+  });
+}
+
 (async function init() {
   await initTopbar({ requireAuth: true });
 
@@ -30,12 +86,15 @@ function setImage(url) {
     window.location.href = "/consent.html";
     return;
   }
-  if (!hasTutorial()) {
-    window.location.href = "/tutorial.html";
-    return;
-  }
 
-  initCountdownTimer();
+  const timerCtrl = initCountdownTimer();
+
+  const url = new URL(window.location.href);
+  const forced = url.searchParams.get("tour") === "1";
+
+  if (forced || !hasTutorial()) {
+    runTour(timerCtrl);
+  }
 })();
 
 makeQrBtn.addEventListener("click", async () => {
