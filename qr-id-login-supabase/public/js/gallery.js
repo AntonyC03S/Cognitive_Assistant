@@ -1,9 +1,7 @@
-import { api, initTopbar } from "/common.js";
+import { api, initTopbar, withCacheBust } from "/js/common.js";
 
 const statusEl = document.getElementById("status");
 const gridEl = document.getElementById("grid");
-
-let evtSource = null;
 
 function setStatus(t) { statusEl.textContent = t || ""; }
 
@@ -16,7 +14,7 @@ function renderItem(row, prepend = false) {
   card.className = "tile";
 
   const img = document.createElement("img");
-  img.src = `${row.public_url}${row.public_url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+  img.src = withCacheBust(row.public_url);
   img.alt = "upload";
 
   const meta = document.createElement("div");
@@ -44,13 +42,13 @@ async function load() {
   try {
     await load();
 
-    evtSource = new EventSource("/api/stream/user");
+    const evtSource = new EventSource("/api/stream/user");
     evtSource.addEventListener("image", (evt) => {
       const row = JSON.parse(evt.data);
       renderItem({ public_url: row.publicUrl, created_at: row.createdAt }, true);
     });
   } catch (e) {
     setStatus(e.message);
-    window.location.href = "/login.html";
+    window.location.href = "/html/login.html";
   }
 })();

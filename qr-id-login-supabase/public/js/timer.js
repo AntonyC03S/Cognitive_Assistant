@@ -1,11 +1,10 @@
-import { api, clearFlowFlags } from "/common.js";
+import { api, clearFlowFlags } from "/js/common.js";
 
-const STORAGE_KEY = "qrCountdownState_v2";
+const STORAGE_KEY = "qrCountdownState_v4";
 const DURATION_MS = 30 * 60 * 1000;
 
 function now() { return Date.now(); }
 function pad2(n) { return String(n).padStart(2, "0"); }
-
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
   const mm = Math.floor(s / 60);
@@ -28,22 +27,14 @@ function saveState(state) {
 }
 
 function newState() {
-  return {
-    running: true,
-    deadline: now() + DURATION_MS,
-    remaining_ms: DURATION_MS
-  };
+  return { running: true, deadline: now() + DURATION_MS, remaining_ms: DURATION_MS };
 }
 
 async function endToEndingScreen() {
-  try {
-    await api("/api/logout", "POST");
-  } catch {
-    // ignore
-  }
+  try { await api("/api/logout", "POST"); } catch {}
   clearFlowFlags();
   sessionStorage.removeItem(STORAGE_KEY);
-  window.location.href = "/ending.html";
+  window.location.href = "/html/ending.html";
 }
 
 export function initCountdownTimer() {
@@ -51,13 +42,10 @@ export function initCountdownTimer() {
   const pauseBtn = document.getElementById("pauseBtn");
   const endBtn = document.getElementById("endBtn");
 
-  if (!timerText || !pauseBtn || !endBtn) return;
+  if (!timerText || !pauseBtn || !endBtn) return null;
 
-  let state = loadState();
-  if (!state) {
-    state = newState();
-    saveState(state);
-  }
+  let state = loadState() || newState();
+  saveState(state);
 
   function remainingMs() {
     return state.running ? (state.deadline - now()) : state.remaining_ms;
@@ -70,46 +58,51 @@ export function initCountdownTimer() {
   function render() {
     const rem = remainingMs();
     timerText.textContent = fmt(rem);
-
-    if (rem <= 0) {
-      endToEndingScreen();
-      return;
-    }
+    if (rem <= 0) endToEndingScreen();
   }
 
-  pauseBtn.addEventListener("click", () => {
-    if (state.running) {
-      state.remaining_ms = Math.max(0, state.deadline - now());
-      state.running = false;
-    } else {
-      state.running = true;
-      state.deadline = now() + Math.max(0, state.remaining_ms);
-    }
+  function pause() {
+    if (!state.running) return;
+    state.remaining_ms = Math.max(0, state.deadline - now());
+    state.running = false;
     saveState(state);
     setButtons();
     render();
-  });
-
-  endBtn.addEventListener("click", () => {
-    endToEndingScreen();
-  });
-
-  // If user logs out manually, clear timer state
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-      sessionStorage.removeItem(STORAGE_KEY);
-    });
   }
+
+  function resume() {
+    if (state.running) return;
+    state.running = true;
+    state.deadline = now() + Math.max(0, state.remaining_ms);
+    saveState(state);
+    setButtons();
+    render();
+  }
+
+  function isRunning() {
+    return !!state.running;
+  }
+
+  function togglePause() {
+    if (state.running) pause();
+    else resume();
+  }
+
+  function end() {
+    endToEndingScreen();
+  }
+
+  pauseBtn.addEventListener("click", togglePause);
+  endBtn.addEventListener("click", end);
+
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) logoutBtn.addEventListener("click", () => sessionStorage.removeItem(STORAGE_KEY));
 
   setButtons();
   render();
 
   const interval = setInterval(render, 250);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
 
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) render();
-  });
-
-  return () => clearInterval(interval);
+  return { pause, resume, end, isRunning, stop: () => clearInterval(interval) };
 }

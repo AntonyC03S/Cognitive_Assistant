@@ -1,4 +1,4 @@
-import { clearFlowFlags } from "/common.js";
+import { clearFlowFlags } from "/js/common.js";
 
 const backBtn = document.getElementById("backBtn");
 
@@ -6,5 +6,5 @@ const backBtn = document.getElementById("backBtn");
 clearFlowFlags();
 
 backBtn.addEventListener("click", () => {
-  window.location.href = "/login.html";
+  window.location.href = "/html/login.html";
 });

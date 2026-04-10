@@ -1,4 +1,4 @@
-import { initTopbar, hasConsent, setTutorial } from "/common.js";
+import { initTopbar, hasConsent, setTutorial } from "/js/common.js";
 
 const btn = document.getElementById("continueBtn");
 
@@ -6,12 +6,12 @@ const btn = document.getElementById("continueBtn");
   await initTopbar({ requireAuth: true });
 
   if (!hasConsent()) {
-    window.location.href = "/consent.html";
+    window.location.href = "/html/consent.html";
     return;
   }
 })();
 
 btn.addEventListener("click", () => {
   setTutorial();
-  window.location.href = "/qr.html";
+  window.location.href = "/html/qr.html";
 });

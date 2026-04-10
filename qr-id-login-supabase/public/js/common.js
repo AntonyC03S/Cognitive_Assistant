@@ -9,6 +9,20 @@ export async function api(path, method = "GET", body) {
   return data;
 }
 
+/** For `<img src>` reloads so the browser does not show a stale cached image. */
+export function withCacheBust(url) {
+  if (!url) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+}
+
+/** Drop one search param from the address bar without reloading; keeps other params and the hash. */
+export function removeCurrentUrlSearchParam(name) {
+  const u = new URL(window.location.href);
+  if (!u.searchParams.has(name)) return;
+  u.searchParams.delete(name);
+  history.replaceState({}, "", `${u.pathname}${u.search}${u.hash}`);
+}
+
 const CONSENT_KEY = "consentAccepted";
 const TUTORIAL_KEY = "tutorialCompleted";
 
@@ -60,12 +74,12 @@ export async function initTopbar({ requireAuth = false } = {}) {
       await api("/api/logout", "POST");
     } finally {
       clearFlowFlags();
-      window.location.href = "/login.html";
+      window.location.href = "/html/login.html";
     }
   });
 
   if (requireAuth && !user) {
-    window.location.href = "/login.html";
+    window.location.href = "/html/login.html";
     return { user: null };
   }
 

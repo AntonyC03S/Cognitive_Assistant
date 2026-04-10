@@ -42,6 +42,8 @@ h2 { margin: 0 0 10px; font-size: 18px; }
 }
 
 .panel { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; }
+.container .panel + .panel { margin-top: 16px; }
+.panel > .preview { margin-top: 16px; }
 .input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; }
 
 .button {
@@ -233,7 +235,6 @@ h2 { margin: 0 0 10px; font-size: 18px; }
   letter-spacing: 0.6px;
   min-width: 110px;
 }
-
 /* Tour overlay */
 .tourRoot {
   position: fixed;

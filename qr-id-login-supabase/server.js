@@ -31,6 +31,11 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 app.use(express.json());
 app.use(cookieParser());
+
+app.get("/", (req, res) => {
+  res.redirect(302, "/html/index.html");
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // -------------------- Simple cookie session (server-side validation) --------------------
@@ -238,7 +243,7 @@ app.get("/api/session", async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  const uploadUrl = `${getPublicBaseUrl(req)}/upload.html?session=${encodeURIComponent(sessionId)}`;
+  const uploadUrl = `${getPublicBaseUrl(req)}/html/upload.html?session=${encodeURIComponent(sessionId)}`;
   res.json({ sessionId, uploadUrl });
 });
 

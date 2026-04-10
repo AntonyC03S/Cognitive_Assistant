@@ -4,12 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>QR Upload</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/css/styles.css" />
   </head>
   <body>
+    <div id="joyrideRoot"></div>
     <header class="topbar">
       <div class="topbarLeft">
-        <div class="brand"><a href="/qr.html">QR Uploader</a></div>
+        <div class="brand"><a href="/html/qr.html">QR Uploader</a></div>
       </div>
 
       <div class="topbarCenter">
@@ -21,13 +22,14 @@
       </div>
 
       <div class="topbarRight authControls">
-        <a class="link" href="/gallery.html">My uploads</a>
+        <a id="myUploadsLink" class="link" href="/html/gallery.html">My uploads</a>
+        <button id="helpBtn" class="button small secondary">Help</button>
+
         <span id="userLabel" class="userLabel"></span>
-        <a id="loginLink" class="link" href="/login.html">Log in</a>
+        <a id="loginLink" class="link" href="/html/login.html">Log in</a>
         <button id="logoutBtn" class="button small secondary">Log out</button>
       </div>
     </header>
-
     <main class="container">
       <h1>QR Upload</h1>
 
@@ -50,6 +52,6 @@
     </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script type="module" src="/qr.js"></script>
+    <script type="module" src="/js/qr.js"></script>
   </body>
 </html>

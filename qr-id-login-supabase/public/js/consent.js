@@ -1,4 +1,4 @@
-import { initTopbar, setConsent } from "/common.js";
+import { initTopbar, setConsent } from "/js/common.js";
 
 const okBtn = document.getElementById("okBtn");
 
@@ -8,5 +8,5 @@ const okBtn = document.getElementById("okBtn");
 
 okBtn.addEventListener("click", () => {
   setConsent();
-  window.location.href = "/tutorial.html";
+  window.location.href = "/html/tutorial.html";
 });
