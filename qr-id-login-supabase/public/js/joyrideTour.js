@@ -31,6 +31,16 @@ export function initJoyrideTour({
         content: "Shows all images you uploaded on your account."
       },
       {
+        target: "#showQrViewBtn",
+        title: "QR / Workspace switch",
+        content: "Use these buttons to switch between QR upload view and the whiteboard workspace."
+      },
+      {
+        target: ".chatBox",
+        title: "AI chat",
+        content: "Ask Google AI questions here while working in either QR or Workspace view."
+      },
+      {
         target: "#makeQrBtn",
         title: "Generate QR",
         content: "Creates a new session and generates a QR code to scan on your phone."
@@ -49,6 +59,31 @@ export function initJoyrideTour({
         target: "#resultImg",
         title: "Preview",
         content: "After you upload, the latest image for this session appears here automatically."
+      },
+      {
+        target: "#showWorkspaceViewBtn",
+        title: "Open workspace",
+        content: "Click Workspace to open whiteboard and collage tools."
+      },
+      {
+        target: "#tabWhiteboardBtn",
+        title: "Whiteboard tab",
+        content: "This opens the drawing whiteboard workspace."
+      },
+      {
+        target: "#wbDrawBtn",
+        title: "Draw / erase / text",
+        content: "Use these tools to draw, erase, and edit text boxes."
+      },
+      {
+        target: "#tabCollageBtn",
+        title: "Collage tab",
+        content: "Switch to collage mode to arrange images and draw on top."
+      },
+      {
+        target: "#colArrangeModeBtn",
+        title: "Arrange mode",
+        content: "Move and resize collage images in this mode."
       },
       {
         target: "#logoutBtn",
@@ -94,6 +129,10 @@ export function initJoyrideTour({
 
       // keep controlled index so restart always begins at step 0
       if (typeof index === "number" && type === "step:after") {
+        // Before whiteboard steps, switch the page into workspace view.
+        if (index === 8) {
+          document.getElementById("showWorkspaceViewBtn")?.click();
+        }
         setStepIndex(index + 1);
       }
 

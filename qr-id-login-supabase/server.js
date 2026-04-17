@@ -9,6 +9,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
+import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +29,10 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SESSION_SECRET) {
 }
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const CHAT_MODEL = process.env.GOOGLE_CHAT_MODEL || "gemini-3-flash-preview";
+const genai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
 
 app.use(express.json());
 app.use(cookieParser());
@@ -361,6 +366,40 @@ app.get("/api/my-uploads", async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ uploads: data });
+});
+
+// -------------------- AI chat (Google Gemini) --------------------
+app.post("/api/chat", async (req, res) => {
+  const s = requireLogin(req, res);
+  if (!s) return;
+
+  if (!genai) {
+    return res.status(500).json({ error: "GOOGLE_API_KEY not configured on server." });
+  }
+
+  const history = Array.isArray(req.body?.history) ? req.body.history : [];
+  const message = String(req.body?.message || "").trim();
+
+  if (!message) return res.status(400).json({ error: "Message is required." });
+
+  const contents = [
+    ...history
+      .filter((m) => m && typeof m.text === "string" && (m.role === "user" || m.role === "model"))
+      .map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
+    { role: "user", parts: [{ text: message }] }
+  ];
+
+  try {
+    const response = await genai.models.generateContent({
+      model: CHAT_MODEL,
+      contents
+    });
+
+    const text = response?.text ?? "";
+    res.json({ reply: text });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || "AI request failed" });
+  }
 });
 
 // Multer errors

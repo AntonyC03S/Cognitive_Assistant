@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>QR Upload</title>
     <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/workspace.css" />
   </head>
   <body>
     <div id="joyrideRoot"></div>
@@ -30,22 +31,207 @@
         <button id="logoutBtn" class="button small secondary">Log out</button>
       </div>
     </header>
-    <main class="container">
-      <h1>QR Upload</h1>
 
-      <section class="panel">
-        <button id="makeQrBtn" class="button">Generate QR</button>
-        <div id="status" class="status"></div>
+    <main class="container workspacePage">
+      <div class="pageSwitchRow">
+        <button id="showQrViewBtn" class="button small">QR Connect</button>
+        <button id="showWorkspaceViewBtn" class="button small secondary">Workspace</button>
+      </div>
 
-        <div class="qrRow">
-          <div>
-            <div id="qr" class="qrBox"></div>
-            <a id="uploadLink" class="link" href="#" target="_blank" rel="noreferrer"></a>
+      <section id="qrView" class="viewSection qrConnectLayout">
+        <aside class="chatBox" aria-label="AI chat">
+          <div class="chatHeader">
+            <div class="chatTitle">AI Assistant</div>
+            <button id="chatClearBtn" class="button small secondary" type="button">Clear</button>
+          </div>
+          <div id="chatMessages" class="chatMessages" aria-live="polite"></div>
+          <form id="chatForm" class="chatForm">
+            <input
+              id="chatInput"
+              class="chatInput"
+              type="text"
+              placeholder="Ask the AI..."
+              autocomplete="off"
+            />
+            <button id="chatSendBtn" class="button small" type="submit">Send</button>
+          </form>
+        </aside>
+
+        <section class="panel connectPanel">
+          <div class="connectPanelHeader">
+            <div>
+              <h2>Connect Phone</h2>
+              <p class="connectPanelSub">Generate a QR code to open upload on your phone.</p>
+            </div>
+            <button id="makeQrBtn" class="button">Generate QR</button>
+          </div>
+          <div id="status" class="status"></div>
+
+          <div class="qrRow">
+            <div>
+              <div id="qr" class="qrBox"></div>
+              <a id="uploadLink" class="link" href="#" target="_blank" rel="noreferrer"></a>
+            </div>
+            <div class="preview">
+              <div class="previewTitle">Latest uploaded image (this session)</div>
+              <img id="resultImg" alt="Uploaded will appear here" />
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="workspaceView" class="app-shell viewSection hidden workspaceLayoutWithChat">
+        <aside class="chatBox" aria-label="AI chat workspace">
+          <div class="chatHeader">
+            <div class="chatTitle">AI Assistant</div>
+            <button id="workspaceChatClearBtn" class="button small secondary" type="button">Clear</button>
+          </div>
+          <div id="workspaceChatMessages" class="chatMessages" aria-live="polite"></div>
+          <form id="workspaceChatForm" class="chatForm">
+            <input
+              id="workspaceChatInput"
+              class="chatInput"
+              type="text"
+              placeholder="Ask the AI..."
+              autocomplete="off"
+            />
+            <button id="workspaceChatSendBtn" class="button small" type="submit">Send</button>
+          </form>
+        </aside>
+
+        <div class="container-lg board-shell">
+          <div class="toolbar-row">
+            <button id="tabWhiteboardBtn" class="btn btn-ghost btn-tab active">Whiteboard</button>
+            <button id="tabCollageBtn" class="btn btn-ghost btn-tab">Pictures &amp; Collage</button>
           </div>
 
-          <div class="preview">
-            <div class="previewTitle">Latest uploaded image (this session)</div>
-            <img id="resultImg" alt="Uploaded will appear here" />
+          <div id="whiteboardPanel" class="tab-panel">
+            <div class="toolbar-grid">
+              <aside class="panel sidebar">
+                <div class="toolbar-row mb-3">
+                  <button id="wbDrawBtn" class="btn btn-tool active">Draw</button>
+                  <button id="wbEraseBtn" class="btn btn-tool">Erase</button>
+                  <button id="wbTextBtn" class="btn btn-tool" title="Edit or move text boxes">Text</button>
+                  <button id="wbClearBtn" class="btn btn-danger-soft ml-auto">Clear</button>
+                </div>
+
+                <div class="mb-3">
+                  <label class="label" for="wbColor">Brush color</label>
+                  <input id="wbColor" class="color-input" type="color" value="#111827" />
+                </div>
+
+                <div class="mb-3">
+                  <label class="label" for="wbSize">Brush size</label>
+                  <input id="wbSize" class="range" type="range" min="1" max="50" value="4" />
+                  <div id="wbSizeValue" class="text-sm text-muted">4px</div>
+                </div>
+
+                <div class="row gap-2 mb-3">
+                  <button id="wbUndoBtn" class="btn flex-1">Undo</button>
+                  <button id="wbRedoBtn" class="btn flex-1">Redo</button>
+                </div>
+
+                <div class="mt-4">
+                  <label class="label">Text boxes</label>
+                  <div class="row gap-2 mt-2">
+                    <button id="wbAddTextBtn" class="btn flex-1">Add text</button>
+                    <button id="wbDeleteTextBtn" class="btn" disabled>Delete</button>
+                  </div>
+                  <div class="muted-note mt-2">In Text mode, click to edit. In Draw mode, text stays visible while you draw over it.</div>
+                </div>
+
+                <div class="mt-4">
+                  <button id="wbExportBtn" class="btn btn-primary" style="width: 100%;">Export PNG</button>
+                </div>
+              </aside>
+
+              <section class="panel stage-panel">
+                <div class="row items-center justify-between mb-2">
+                  <div class="text-sm text-muted">Canvas</div>
+                  <div id="wbModeLabel" class="muted-note">Mode: draw</div>
+                </div>
+
+                <div id="wbContainer" class="canvas-stage">
+                  <canvas id="wbCanvas" class="canvas-layer"></canvas>
+                  <div id="wbTextLayer" class="overlay-layer"></div>
+                </div>
+
+                <div class="muted-note mt-4">Tip: use Text mode to edit text boxes, then switch back to Draw to sketch over them.</div>
+              </section>
+            </div>
+          </div>
+
+          <div id="collagePanel" class="tab-panel hidden">
+            <div class="toolbar-grid collage">
+              <aside class="panel sidebar">
+                <div class="toolbar-row mb-3">
+                  <button id="colDrawBtn" class="btn btn-tool active">Draw</button>
+                  <button id="colEraseBtn" class="btn btn-tool">Erase</button>
+                  <button id="colArrangeBtn" class="btn btn-tool">Arrange</button>
+                  <button id="colClearBtn" class="btn btn-danger-soft ml-auto">Clear</button>
+                </div>
+
+                <div class="mb-3">
+                  <label class="label" for="colColor">Brush color</label>
+                  <input id="colColor" class="color-input" type="color" value="#111827" />
+                </div>
+
+                <div class="mb-3">
+                  <label class="label" for="colSize">Brush size</label>
+                  <input id="colSize" class="range" type="range" min="1" max="50" value="4" />
+                  <div id="colSizeValue" class="text-sm text-muted">4px</div>
+                </div>
+
+                <div class="row gap-2 mb-3">
+                  <button id="colUndoBtn" class="btn flex-1">Undo</button>
+                  <button id="colRedoBtn" class="btn flex-1">Redo</button>
+                </div>
+
+                <div class="mt-4">
+                  <div class="label" style="margin-bottom: 8px;">Add images from your computer</div>
+                  <input id="colFileInput" type="file" accept="image/*" />
+                  <div class="muted-note mt-2">Tip: Use Quickbeam to transfer phone photos to desktop.</div>
+                </div>
+
+                <div class="mt-5">
+                  <div class="label" style="margin-bottom: 8px;">Add images from the web</div>
+                  <input id="webImageUrl" class="input" placeholder="Paste a direct image URL (https://...)" />
+                  <div id="webImageError" class="text-xs text-danger mt-2 hidden"></div>
+                  <div class="row gap-2 mt-2">
+                    <button id="addUrlImageBtn" class="btn flex-1">Add URL image</button>
+                    <a href="https://www.google.com/imghp" target="_blank" rel="noreferrer" class="btn text-sm" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Search</a>
+                  </div>
+                  <div class="muted-note mt-2">Copy a direct image link. Some websites block export due to CORS.</div>
+                </div>
+
+                <div class="mt-5">
+                  <div class="label" style="margin-bottom: 8px;">Arrange images</div>
+                  <div class="row gap-2">
+                    <button id="colArrangeModeBtn" class="btn btn-primary flex-1">Arrange mode</button>
+                    <button id="colDeleteImageBtn" class="btn" disabled>Delete</button>
+                  </div>
+                  <div class="muted-note mt-2">Drag to move. Use the blue corner handle to resize.</div>
+                </div>
+
+                <div class="mt-5">
+                  <button id="colExportBtn" class="btn btn-primary" style="width: 100%;">Export Collage PNG</button>
+                </div>
+              </aside>
+
+              <section class="panel stage-panel">
+                <div class="row items-center justify-between mb-2">
+                  <div class="text-sm text-muted">Collage Canvas</div>
+                  <div id="colModeLabel" class="muted-note">Mode: draw</div>
+                </div>
+
+                <div id="colContainer" class="canvas-stage">
+                  <div id="colImageLayer" class="overlay-layer image-layer"></div>
+                  <canvas id="colCanvas" class="overlay-layer draw-layer-top"></canvas>
+                </div>
+
+                <div class="muted-note mt-4">In Arrange mode you can move and resize images. In Draw mode you can draw on top of the collage.</div>
+              </section>
+            </div>
           </div>
         </div>
       </section>

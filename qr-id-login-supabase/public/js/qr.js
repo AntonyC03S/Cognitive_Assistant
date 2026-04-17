@@ -9,6 +9,8 @@ import {
 } from "/js/common.js";
 import { initCountdownTimer } from "/js/timer.js";
 import { initJoyrideTour } from "/js/joyrideTour.js";
+import { initWorkspace, refreshWorkspaceCanvas } from "/js/workspace.js";
+import { initChat } from "/js/chat.js";
 
 const makeQrBtn = document.getElementById("makeQrBtn");
 const qrDiv = document.getElementById("qr");
@@ -16,8 +18,14 @@ const statusEl = document.getElementById("status");
 const uploadLink = document.getElementById("uploadLink");
 const resultImg = document.getElementById("resultImg");
 
+const qrView = document.getElementById("qrView");
+const workspaceView = document.getElementById("workspaceView");
+const showQrViewBtn = document.getElementById("showQrViewBtn");
+const showWorkspaceViewBtn = document.getElementById("showWorkspaceViewBtn");
+
 let evtSource = null;
 let timerCtrl = null;
+let workspaceReady = false;
 
 function setStatus(t) { statusEl.textContent = t || ""; }
 
@@ -30,6 +38,29 @@ function clearQr() {
 function setImage(url) {
   if (!url) return;
   resultImg.src = withCacheBust(url);
+}
+
+function setActiveSwitch(active) {
+  showQrViewBtn.classList.toggle("secondary", active !== "qr");
+  showWorkspaceViewBtn.classList.toggle("secondary", active !== "workspace");
+}
+
+function showQr() {
+  qrView.classList.remove("hidden");
+  workspaceView.classList.add("hidden");
+  setActiveSwitch("qr");
+}
+
+function showWorkspace() {
+  qrView.classList.add("hidden");
+  workspaceView.classList.remove("hidden");
+  setActiveSwitch("workspace");
+
+  if (!workspaceReady) {
+    initWorkspace();
+    workspaceReady = true;
+  }
+  refreshWorkspaceCanvas();
 }
 
 (async function init() {
@@ -55,7 +86,12 @@ function setImage(url) {
     }
   });
 
-  // Trigger Help once the button listener has been attached.
+  showQrViewBtn.addEventListener("click", showQr);
+  showWorkspaceViewBtn.addEventListener("click", showWorkspace);
+  showQr();
+
+  initChat();
+
   setTimeout(() => {
     document.getElementById("helpBtn")?.click();
   }, 0);
