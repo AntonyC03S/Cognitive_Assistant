@@ -17,6 +17,8 @@ const qrDiv = document.getElementById("qr");
 const statusEl = document.getElementById("status");
 const uploadLink = document.getElementById("uploadLink");
 const resultImg = document.getElementById("resultImg");
+const recentUploadsStatusEl = document.getElementById("recentUploadsStatus");
+const recentUploadsGridEl = document.getElementById("recentUploadsGrid");
 
 const qrView = document.getElementById("qrView");
 const workspaceView = document.getElementById("workspaceView");
@@ -29,6 +31,11 @@ let workspaceReady = false;
 
 function setStatus(message) {
   statusEl.textContent = message || "";
+}
+
+function setRecentUploadsStatus(message) {
+  if (!recentUploadsStatusEl) return;
+  recentUploadsStatusEl.textContent = message || "";
 }
 
 function clearQrDisplay() {
@@ -46,6 +53,61 @@ function closeEventStream() {
   if (!evtSource) return;
   evtSource.close();
   evtSource = null;
+}
+
+function formatTime(iso) {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function renderRecentUploadItem(row, prepend = false) {
+  if (!recentUploadsGridEl || !row?.public_url) return;
+
+  const card = document.createElement("div");
+  card.className = "tile";
+
+  const img = document.createElement("img");
+  img.src = withCacheBust(row.public_url);
+  img.alt = "upload";
+
+  const meta = document.createElement("div");
+  meta.className = "tileMeta";
+  meta.textContent = formatTime(row.created_at);
+
+  card.appendChild(img);
+  card.appendChild(meta);
+
+  if (prepend) {
+    recentUploadsGridEl.prepend(card);
+  } else {
+    recentUploadsGridEl.appendChild(card);
+  }
+}
+
+async function loadRecentUploads() {
+  // Reuse gallery endpoint and show a compact list on the QR page.
+  if (!recentUploadsGridEl) return;
+  setRecentUploadsStatus("Loading recent uploads...");
+  recentUploadsGridEl.innerHTML = "";
+
+  try {
+    const data = await api("/api/my-uploads", "GET");
+    const uploads = Array.isArray(data.uploads) ? data.uploads : [];
+    const recent = uploads.slice(0, 6);
+
+    for (const row of recent) renderRecentUploadItem(row);
+
+    if (recent.length === 0) {
+      setRecentUploadsStatus("No uploads yet.");
+    } else {
+      setRecentUploadsStatus(`Showing ${recent.length} recent upload${recent.length === 1 ? "" : "s"}.`);
+    }
+  } catch (error) {
+    setRecentUploadsStatus(error instanceof Error ? error.message : "Failed to load recent uploads.");
+  }
 }
 
 function setSwitchState(activeView) {
@@ -68,6 +130,7 @@ function showWorkspace() {
   setSwitchState("workspace");
 
   if (!workspaceReady) {
+    // Workspace initializes lazily to keep first QR view fast.
     initWorkspace();
     workspaceReady = true;
   }
@@ -76,6 +139,7 @@ function showWorkspace() {
 }
 
 async function createSessionQr() {
+  // Create a new upload session and open an SSE stream for live image updates.
   clearQrDisplay();
   resultImg.removeAttribute("src");
   setStatus("Creating session...");
@@ -102,6 +166,10 @@ async function createSessionQr() {
       const message = JSON.parse(event.data);
       setImage(message.publicUrl);
       setStatus("Image received.");
+      renderRecentUploadItem(
+        { public_url: message.publicUrl, created_at: new Date().toISOString() },
+        true
+      );
     });
 
     evtSource.addEventListener("error", () => {
@@ -115,6 +183,7 @@ async function createSessionQr() {
 }
 
 async function init() {
+  // Main page bootstrap: auth/checks -> timer/tour -> view handlers -> auto QR.
   await initTopbar({ requireAuth: true });
 
   if (!hasConsent()) {
@@ -143,6 +212,8 @@ async function init() {
   window.addEventListener("beforeunload", closeEventStream);
 
   showQr();
+  await loadRecentUploads();
+  await createSessionQr();
   initChat();
 }
 

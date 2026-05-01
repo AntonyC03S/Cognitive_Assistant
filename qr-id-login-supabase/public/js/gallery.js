@@ -10,6 +10,7 @@ function formatTime(iso) {
 }
 
 function renderItem(row, prepend = false) {
+  // One gallery card = uploaded image + timestamp metadata.
   const card = document.createElement("div");
   card.className = "tile";
 
@@ -29,6 +30,7 @@ function renderItem(row, prepend = false) {
 }
 
 async function load() {
+  // Initial gallery load (newest first from backend).
   setStatus("Loading...");
   const data = await api("/api/my-uploads", "GET");
   gridEl.innerHTML = "";
@@ -42,6 +44,8 @@ async function load() {
   try {
     await load();
 
+    // Live updates: when a new upload arrives for this user,
+    // prepend it to the top of the gallery in real time.
     const evtSource = new EventSource("/api/stream/user");
     evtSource.addEventListener("image", (evt) => {
       const row = JSON.parse(evt.data);

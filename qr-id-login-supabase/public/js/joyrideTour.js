@@ -8,12 +8,14 @@ export function initJoyrideTour({
   getTimerCtrl,
   onComplete
 } = {}) {
+  // Mount a React-based guided tour on top of the plain JS page.
   const mount = document.getElementById(mountId);
   if (!mount) return;
 
   const root = createRoot(mount);
 
   function App() {
+    // Ordered walkthrough targets across QR view and workspace view.
     const steps = useMemo(() => ([
       {
         target: ".timerBig",

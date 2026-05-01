@@ -11,6 +11,8 @@ import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
 
+// Backend for the QR upload app:
+// auth + sessioned uploads + realtime streams + gallery + AI chat.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -32,6 +34,8 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const CHAT_MODEL = process.env.GOOGLE_CHAT_MODEL || "gemini-3-flash-preview";
+// Safety cap so UI does not get huge assistant messages.
+const CHAT_MAX_OUTPUT_CHARS = Number(process.env.CHAT_MAX_OUTPUT_CHARS || 700);
 const genai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
 
 app.use(express.json());
@@ -239,6 +243,7 @@ app.get("/api/session", async (req, res) => {
   const s = requireLogin(req, res);
   if (!s) return;
 
+  // Create a one-time upload session used by QR/upload flow.
   const sessionId = crypto.randomUUID();
 
   const { error } = await supabaseAdmin.from("sessions").insert({
@@ -342,7 +347,7 @@ app.post("/api/upload/:sessionId", upload.single("image"), async (req, res) => {
 
     if (dbErr) return res.status(500).json({ error: dbErr.message });
 
-    // Notify connected desktop clients
+    // Push realtime updates to active QR page and gallery listeners.
     broadcast(sessionStreams, sessionId, "image", { publicUrl: row.public_url, createdAt: row.created_at });
     broadcast(userStreams, sess.user_id, "image", { publicUrl: row.public_url, createdAt: row.created_at });
 
@@ -390,12 +395,39 @@ app.post("/api/chat", async (req, res) => {
   ];
 
   try {
+    // Keep answers concise for in-app assistant UX.
     const response = await genai.models.generateContent({
       model: CHAT_MODEL,
+      config: {
+        systemInstruction:
+          `Act like a creative idea coach. Your job is to help me discover what I want to make. Start by asking focused questions about:
+          -what I enjoy
+          -what skills I have
+          -what kind of project I want
+          -who it is for
+          -what style or mood I want
+          -how much time or effort I can spend
+
+          After that, generate a list of project ideas tailored to my answers. For each idea, include:
+
+          -title
+          -concept
+          -why it fits me
+          -possible style
+          -difficulty level
+          -first step to begin
+
+          Then rank the top 3 ideas and explain which one is best for me and why.`,
+        maxOutputTokens: 300
+      },
       contents
     });
 
-    const text = response?.text ?? "";
+    const rawText = String(response?.text ?? "").trim();
+    const text =
+      rawText.length > CHAT_MAX_OUTPUT_CHARS
+        ? rawText.slice(0, CHAT_MAX_OUTPUT_CHARS - 1).trimEnd() + "…"
+        : rawText;
     res.json({ reply: text });
   } catch (e) {
     res.status(500).json({ error: e?.message || "AI request failed" });

@@ -38,6 +38,7 @@ const state = {
 let els = null;
 let initialized = false;
 
+// Tiny helper to keep DOM lookups concise.
 function $(id) {
   return document.getElementById(id);
 }
@@ -160,6 +161,7 @@ function resizeUnifiedCanvas() {
   resizeCanvasToContainer(els.uniCanvas, els.uniContainer, false);
 }
 
+// -------------------- Draw layer (ink strokes) --------------------
 function drawPushHistory() {
   try {
     const data = els.uniCanvas.toDataURL("image/png");
@@ -188,6 +190,8 @@ function drawRestore(index) {
 }
 
 function setWorkspaceMode(mode, tool) {
+  // `mode` controls which layer is interactive:
+  // draw -> canvas, text -> text boxes, objects -> image arrange handles.
   state.mode = mode;
   if (tool) state.drawTool = tool;
 
@@ -333,6 +337,7 @@ function focusEditableTextBox(id) {
 }
 
 function renderTextBoxes() {
+  // Render editable/draggable text boxes on the top-most layer.
   els.wsDeleteTextBtn.disabled = !state.activeTextId;
   els.uniTextLayer.innerHTML = "";
   const interactive = state.mode === "text";
@@ -521,6 +526,8 @@ function renderWrappedText(ctx, text, x, y, w, h, fontSize) {
 }
 
 async function unifiedExportPNG() {
+  // Composite export order:
+  // white background -> placed images -> drawing canvas -> text boxes.
   const out = document.createElement("canvas");
   out.width = els.uniCanvas.width;
   out.height = els.uniCanvas.height;
@@ -595,6 +602,7 @@ function updateImage(id, patch) {
 }
 
 function renderImages() {
+  // Render movable/resizable image objects on the image layer.
   const interactive = state.mode === "objects";
   els.wsDeleteImageBtn.disabled = !state.activeImageId;
   els.uniImageLayer.innerHTML = "";
@@ -714,6 +722,7 @@ function addImageFromUrl() {
 }
 
 function bindWorkspaceEvents() {
+  // All sidebar controls and pointer handlers are wired here.
   els.wsDrawBtn.addEventListener("click", function () {
     setWorkspaceMode("draw", "draw");
   });
@@ -818,6 +827,7 @@ export function initWorkspace() {
   renderImages();
 
   requestAnimationFrame(function () {
+    // First frame setup: fit canvas to container and seed initial undo history.
     resizeUnifiedCanvas();
     fillCanvasWhite(els.uniCanvas);
     drawPushHistory();

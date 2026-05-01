@@ -1,5 +1,6 @@
 import { initTopbar, setConsent } from "/js/common.js";
 
+// Local backup record of consent form details (browser-side only).
 const STORAGE_KEY = "study_consent_v1";
 
 const els = {
@@ -21,6 +22,7 @@ function saveConsentRecord(record) {
 }
 
 function goNext() {
+  // Session flag is what app flow checks before allowing tutorial/QR.
   setConsent();
   window.location.href = "/html/tutorial.html";
 }
@@ -41,6 +43,7 @@ function submitConsent() {
     agreedAt: new Date().toISOString()
   };
 
+  // Keep a local copy for convenience/auditing during the same browser usage.
   saveConsentRecord(record);
   goNext();
 }

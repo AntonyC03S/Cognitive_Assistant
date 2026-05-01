@@ -1,5 +1,6 @@
 import { api, clearFlowFlags } from "/js/common.js";
 
+// Persist countdown in sessionStorage so refresh/tab switches keep timing.
 const STORAGE_KEY = "qrCountdownState_v4";
 const DURATION_MS = 30 * 60 * 1000;
 
@@ -31,6 +32,7 @@ function newState() {
 }
 
 async function endToEndingScreen() {
+  // End of session: logout server-side, clear local flow, then route to ending page.
   try { await api("/api/logout", "POST"); } catch {}
   clearFlowFlags();
   sessionStorage.removeItem(STORAGE_KEY);
@@ -48,6 +50,7 @@ export function initCountdownTimer() {
   saveState(state);
 
   function remainingMs() {
+    // When running, derive from deadline; when paused, use frozen remainder.
     return state.running ? (state.deadline - now()) : state.remaining_ms;
   }
 
@@ -89,6 +92,7 @@ export function initCountdownTimer() {
   }
 
   function end() {
+    // Manual "End" mirrors natural timer completion behavior.
     endToEndingScreen();
   }
 

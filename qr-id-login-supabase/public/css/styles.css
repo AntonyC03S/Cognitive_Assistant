@@ -286,6 +286,28 @@ h2 {
   background: #fff;
 }
 
+.recentUploadsSection {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef0f4;
+}
+
+.recentUploadsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.recentUploadsGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.recentUploadsGrid .tile img {
+  height: 140px;
+}
+
 .chatBox {
   position: sticky;
   top: 88px;

@@ -1,4 +1,5 @@
 export async function api(path, method = "GET", body) {
+  // Small fetch wrapper used by all pages: JSON in/out + consistent errors.
   const resp = await fetch(path, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -46,6 +47,7 @@ export function setTutorial() {
 }
 
 export async function initTopbar({ requireAuth = false } = {}) {
+  // Shared topbar behavior: show user/login/logout state on every page.
   const userLabel = document.getElementById("userLabel");
   const loginLink = document.getElementById("loginLink");
   const logoutBtn = document.getElementById("logoutBtn");
@@ -73,6 +75,7 @@ export async function initTopbar({ requireAuth = false } = {}) {
     try {
       await api("/api/logout", "POST");
     } finally {
+      // Logging out resets this flow state for future sessions.
       clearFlowFlags();
       window.location.href = "/html/login.html";
     }

@@ -10,6 +10,8 @@ const loginBtn = document.getElementById("loginBtn");
 function setStatus(t) { statusEl.textContent = t || ""; }
 
 function routeAfterLogin() {
+  // Decide where an already-logged-in user should continue:
+  // consent -> tutorial/tour -> main QR page.
   if (!hasConsent()) return "/html/consent.html";
   if (!hasTutorial()) return "/html/qr.html?tour=1";
   return "/html/qr.html";
@@ -22,6 +24,7 @@ async function submitAuth(endpoint, loadingMessage) {
       username: usernameEl.value.trim(),
       password: passwordEl.value
     });
+    // New auth means this is a new run through the consent/tutorial flow.
     clearFlowFlags();
     window.location.href = "/html/consent.html";
   } catch (e) {
@@ -30,6 +33,7 @@ async function submitAuth(endpoint, loadingMessage) {
 }
 
 (async function init() {
+  // If already authenticated, skip login/signup UI.
   const { user } = await initTopbar({ requireAuth: false });
   if (user) {
     window.location.href = routeAfterLogin();

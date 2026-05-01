@@ -6,6 +6,106 @@
     <title>Consent</title>
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/workspace.css" />
+    <style>
+      .consent-page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 40px 24px 64px;
+      }
+
+      .consent-wrap {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+
+      .consent-card {
+        padding: 28px;
+        border-radius: 18px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+      }
+
+      .consent-copy {
+        margin-top: 24px;
+        color: #374151;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .consent-copy p {
+        margin: 0 0 14px;
+      }
+
+      .consent-copy ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .consent-copy li + li {
+        margin-top: 8px;
+      }
+
+      .consent-field {
+        margin-top: 24px;
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 22px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .checkbox-row input {
+        margin-top: 3px;
+      }
+
+      .error-box {
+        margin-top: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #b91c1c;
+        font-size: 14px;
+      }
+
+      .footer-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+      }
+
+      .consent-note {
+        max-width: 760px;
+        margin: 14px auto 0;
+        padding: 0 4px;
+      }
+
+      @media (max-width: 720px) {
+        .consent-page {
+          padding: 24px 16px 48px;
+        }
+
+        .consent-card {
+          padding: 20px;
+          border-radius: 14px;
+        }
+
+        .footer-row {
+          align-items: stretch;
+        }
+
+        .footer-row .btn {
+          width: 100%;
+        }
+      }
+    </style>
   </head>
   <body>
     <header class="topbar">
@@ -18,52 +118,76 @@
       <div class="topbarRight authControls">
         <span id="userLabel" class="userLabel"></span>
         <a id="loginLink" class="link" href="/html/login.html">Log in</a>
-        <button id="logoutBtn" class="button small secondary">Log out</button>
+        <button id="logoutBtn" class="button small secondary" type="button">Log out</button>
       </div>
     </header>
 
-    <main class="container app-shell">
-      <section id="consentScreen" class="container-sm">
-        <div class="panel panel-pad">
+    <main class="consent-page">
+      <section id="consentScreen" class="consent-wrap">
+        <div class="panel consent-card">
           <div class="header-block">
             <div>
               <h1 class="text-2xl font-semibold" style="margin: 0;">Consent Form</h1>
-              <p class="text-sm text-muted mt-1" style="margin-bottom: 0;">Please review and sign to continue.</p>
+              <p class="text-sm text-muted mt-1" style="margin: 6px 0 0;">
+                Please review and sign to continue.
+              </p>
             </div>
-            <button id="devSkipBtn" class="btn-linkish text-sm" title="Skip for development">Dev Skip</button>
+            <button
+              id="devSkipBtn"
+              class="btn-linkish text-sm"
+              type="button"
+              title="Skip for development"
+            >
+              Dev Skip
+            </button>
           </div>
 
-          <div class="mt-6 space-y-4 text-sm leading-relaxed" style="color: #374151;">
-            <p>You are being asked to participate in a research study. Your participation is voluntary. You may stop at any time.</p>
-            <ul class="info-list space-y-2">
+          <div class="consent-copy">
+            <p>
+              You are being asked to participate in a research study. Your participation is voluntary.
+              You may stop at any time.
+            </p>
+
+            <ul>
               <li>Task: use a digital whiteboard and/or build a collage.</li>
               <li>Data: your drawings and any images you add may be saved.</li>
               <li>Risks: minimal; avoid sharing sensitive personal info.</li>
             </ul>
-            <p class="text-muted">Replace this consent text with your institution approved language.</p>
+
+            <p style="margin-top: 14px;">
+              Replace this consent text with your institution approved language.
+            </p>
           </div>
 
-          <div class="mt-6">
+          <div class="consent-field">
             <label class="label" for="participantId">Participant ID (optional)</label>
-            <input id="participantId" class="input" placeholder="e.g., P-001" />
+            <input
+              id="participantId"
+              class="input"
+              type="text"
+              placeholder="e.g., P-001"
+              autocomplete="off"
+            />
           </div>
 
-          <label class="checkbox-row">
+          <label class="checkbox-row" for="agreeCheckbox">
             <input id="agreeCheckbox" type="checkbox" />
             <span>I have read the information above and consent to participate.</span>
           </label>
 
           <div id="consentError" class="error-box hidden"></div>
 
-          <div class="row gap-3 items-center justify-between mt-6" style="flex-wrap: wrap;">
+          <div class="footer-row">
             <div id="consentDate" class="muted-note"></div>
-            <button id="startBtn" class="btn btn-primary">Start</button>
+            <button id="startBtn" class="btn btn-primary" type="button">Start</button>
           </div>
         </div>
 
-        <div class="muted-note mt-4">
+        <div class="muted-note consent-note">
           Developer note: consent is stored in localStorage as
-          <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">study_consent_v1</span>.
+          <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+            study_consent_v1
+          </span>.
         </div>
       </section>
     </main>

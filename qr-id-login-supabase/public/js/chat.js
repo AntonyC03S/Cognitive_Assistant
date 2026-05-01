@@ -1,6 +1,8 @@
 import { api } from "/js/common.js";
 
+// Keep short shared context to avoid very long prompts and responses.
 const MAX_HISTORY = 20;
+const SHARED_HISTORY_KEY = "chatHistory_shared";
 
 function loadHistoryFor(key) {
   try {
@@ -24,6 +26,7 @@ export function initChatWidget({
   clearBtnId,
   historyKey
 }) {
+  // Legacy single-widget initializer (kept for reuse if needed elsewhere).
   const form = document.getElementById(formId);
   const input = document.getElementById(inputId);
   const sendBtn = document.getElementById(sendBtnId);
@@ -39,7 +42,7 @@ export function initChatWidget({
     if (history.length === 0) {
       const hint = document.createElement("div");
       hint.className = "chatMsg model";
-      hint.textContent = "Hi! Ask me anything.";
+      hint.textContent = "Hi! I am a creative idea coach. Ask me anything about your project ideas.";
       messagesEl.appendChild(hint);
       return;
     }
@@ -112,21 +115,116 @@ export function initChatWidget({
 }
 
 export function initChat() {
-  initChatWidget({
-    formId: "chatForm",
-    inputId: "chatInput",
-    sendBtnId: "chatSendBtn",
-    messagesId: "chatMessages",
-    clearBtnId: "chatClearBtn",
-    historyKey: "chatHistory_qr"
-  });
+  // Two visible chat panels (QR + Workspace) share one history and one send pipeline.
+  const widgets = [
+    {
+      form: document.getElementById("chatForm"),
+      input: document.getElementById("chatInput"),
+      sendBtn: document.getElementById("chatSendBtn"),
+      messagesEl: document.getElementById("chatMessages"),
+      clearBtn: document.getElementById("chatClearBtn")
+    },
+    {
+      form: document.getElementById("workspaceChatForm"),
+      input: document.getElementById("workspaceChatInput"),
+      sendBtn: document.getElementById("workspaceChatSendBtn"),
+      messagesEl: document.getElementById("workspaceChatMessages"),
+      clearBtn: document.getElementById("workspaceChatClearBtn")
+    }
+  ].filter((w) => w.form && w.input && w.messagesEl);
 
-  initChatWidget({
-    formId: "workspaceChatForm",
-    inputId: "workspaceChatInput",
-    sendBtnId: "workspaceChatSendBtn",
-    messagesId: "workspaceChatMessages",
-    clearBtnId: "workspaceChatClearBtn",
-    historyKey: "chatHistory_workspace"
-  });
+  if (widgets.length === 0) return;
+
+  let history = loadHistoryFor(SHARED_HISTORY_KEY);
+  let inFlight = false;
+
+  function setBusy(isBusy) {
+    // Lock both UIs during an in-flight request to avoid duplicate sends.
+    inFlight = isBusy;
+    for (const w of widgets) {
+      if (w.sendBtn) w.sendBtn.disabled = isBusy;
+      w.input.disabled = isBusy;
+    }
+  }
+
+  function addMessageTo(el, role, text, extraClass) {
+    const div = document.createElement("div");
+    div.className = "chatMsg " + role + (extraClass ? " " + extraClass : "");
+    div.textContent = text;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+    return div;
+  }
+
+  function renderAll() {
+    for (const w of widgets) {
+      w.messagesEl.innerHTML = "";
+      if (history.length === 0) {
+        addMessageTo(w.messagesEl, "model", "Hi! I am a creative idea coach. Ask me anything about your project ideas.");
+        continue;
+      }
+      for (const msg of history) {
+        addMessageTo(w.messagesEl, msg.role, msg.text);
+      }
+    }
+  }
+
+  function appendToAll(role, text, extraClass) {
+    const nodes = [];
+    for (const w of widgets) nodes.push(addMessageTo(w.messagesEl, role, text, extraClass));
+    return nodes;
+  }
+
+  async function sendFrom(widget) {
+    if (inFlight) return;
+    const trimmed = widget.input.value.trim();
+    if (!trimmed) return;
+
+    for (const w of widgets) w.input.value = "";
+    setBusy(true);
+
+    appendToAll("user", trimmed);
+    const thinkingNodes = appendToAll("model", "Thinking...", "typing");
+
+    const historyForApi = history.slice(-MAX_HISTORY);
+
+    try {
+      const data = await api("/api/chat", "POST", {
+        message: trimmed,
+        history: historyForApi
+      });
+
+      const reply = String(data?.reply || "").trim() || "(no response)";
+
+      for (const node of thinkingNodes) node.remove();
+      appendToAll("model", reply);
+
+      history.push({ role: "user", text: trimmed });
+      history.push({ role: "model", text: reply });
+      if (history.length > MAX_HISTORY * 2) history = history.slice(-MAX_HISTORY * 2);
+      saveHistoryFor(SHARED_HISTORY_KEY, history);
+    } catch (e) {
+      for (const node of thinkingNodes) node.remove();
+      appendToAll("model", e?.message || "Chat failed.", "error");
+    } finally {
+      setBusy(false);
+      widget.input.focus();
+    }
+  }
+
+  for (const w of widgets) {
+    w.form.addEventListener("submit", (evt) => {
+      evt.preventDefault();
+      sendFrom(w);
+    });
+
+    w.clearBtn?.addEventListener("click", () => {
+      history = [];
+      saveHistoryFor(SHARED_HISTORY_KEY, history);
+      renderAll();
+      w.input.focus();
+    });
+  }
+
+  renderAll();
 }
