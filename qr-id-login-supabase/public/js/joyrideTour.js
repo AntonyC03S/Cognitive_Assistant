@@ -63,34 +63,29 @@ export function initJoyrideTour({
       {
         target: "#showWorkspaceViewBtn",
         title: "Open workspace",
-        content: "Click Workspace to open whiteboard and collage tools."
+        content: "Click Workspace for the combined drawing board, text, and images."
       },
       {
-        target: "#tabWhiteboardBtn",
-        title: "Whiteboard tab",
-        content: "This opens the drawing whiteboard workspace."
+        target: "#workspaceBoardShell",
+        title: "Workspace",
+        content: "One board: draw and erase, text boxes, photos from files or URLs, and Arrange mode to move or resize images. Export saves the whole scene."
       },
       {
-        target: "#wbDrawBtn",
-        title: "Draw / erase / text",
-        content: "Use these tools to draw, erase, and edit text boxes."
+        target: "#wsDrawBtn",
+        title: "Tools",
+        content: "Draw and Erase use the brush; Text adds editable boxes; Arrange selects images to drag or resize."
       },
       {
-        target: "#tabCollageBtn",
-        title: "Collage tab",
-        content: "Switch to collage mode to arrange images and draw on top."
-      },
-      {
-        target: "#colArrangeModeBtn",
-        title: "Arrange mode",
-        content: "Move and resize collage images in this mode."
+        target: "#wsArrangeBtn",
+        title: "Arrange",
+        content: "Switch here to move and resize photos on the board."
       },
       {
         target: "#logoutBtn",
         title: "Log out",
         content: "Logs you out and sends you back to the login screen."
       }
-    ]), []);
+    ].map((step) => ({ ...step, disableBeacon: true }))), []);
 
     const [run, setRun] = useState(autoStart);
     const [stepIndex, setStepIndex] = useState(0);
@@ -125,21 +120,28 @@ export function initJoyrideTour({
     }, [run]);
 
     function handleCallback(data) {
-      const { status, index, type } = data;
-
-      // keep controlled index so restart always begins at step 0
-      if (typeof index === "number" && type === "step:after") {
-        // Before whiteboard steps, switch the page into workspace view.
-        if (index === 8) {
-          document.getElementById("showWorkspaceViewBtn")?.click();
-        }
-        setStepIndex(index + 1);
-      }
+      const { status, index, type, action } = data;
 
       if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
         setRun(false);
         setStepIndex(0);
         onComplete?.();
+        return;
+      }
+
+      // Controlled stepIndex must follow Joyride's next/prev; always incrementing broke Back.
+      if (typeof index === "number" && type === "step:after") {
+        if (action === "next") {
+          if (index === 9) {
+            document.getElementById("showWorkspaceViewBtn")?.click();
+          }
+          setStepIndex(index + 1);
+        } else if (action === "prev") {
+          if (index === 9) {
+            document.getElementById("showQrViewBtn")?.click();
+          }
+          setStepIndex(Math.max(0, index - 1));
+        }
       }
     }
 

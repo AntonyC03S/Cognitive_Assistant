@@ -1,20 +1,17 @@
-// Whiteboard + Collage workspace, moved from whiteboard.html.
-// Consent logic lives in consent.js. Call initWorkspace() when the
-// workspace view is first shown, then showWorkspace() on later toggles.
+// Single workspace board: freehand draw/erase, text boxes, images, arrange mode, export.
 
 const state = {
-  tab: "whiteboard",
+  mode: "draw",
+  drawTool: "draw",
+  brushColor: "#111827",
+  brushSize: 4,
+  drawIsDrawing: false,
+  drawHistory: [],
+  drawHistoryIndex: -1,
 
-  wbMode: "draw",
-  wbTool: "draw",
-  wbColor: "#111827",
-  wbSize: 4,
-  wbIsDrawing: false,
-  wbHistory: [],
-  wbHistoryIndex: -1,
-  wbTextBoxes: [],
-  wbActiveTextId: null,
-  wbDrag: {
+  textBoxes: [],
+  activeTextId: null,
+  textDrag: {
     dragging: false,
     id: null,
     startX: 0,
@@ -23,16 +20,9 @@ const state = {
     origY: 0
   },
 
-  colMode: "draw",
-  colTool: "draw",
-  colColor: "#111827",
-  colSize: 4,
-  colIsDrawing: false,
-  colHistory: [],
-  colHistoryIndex: -1,
-  colImages: [],
-  colActiveImageId: null,
-  colDrag: {
+  images: [],
+  activeImageId: null,
+  imageDrag: {
     dragging: false,
     resizing: false,
     id: null,
@@ -48,52 +38,37 @@ const state = {
 let els = null;
 let initialized = false;
 
-function $(id) { return document.getElementById(id); }
+function $(id) {
+  return document.getElementById(id);
+}
 
 function bindEls() {
   els = {
-    tabWhiteboardBtn: $("tabWhiteboardBtn"),
-    tabCollageBtn: $("tabCollageBtn"),
-    whiteboardPanel: $("whiteboardPanel"),
-    collagePanel: $("collagePanel"),
+    uniContainer: $("uniContainer"),
+    uniCanvas: $("uniCanvas"),
+    uniImageLayer: $("uniImageLayer"),
+    uniTextLayer: $("uniTextLayer"),
 
-    wbContainer: $("wbContainer"),
-    wbCanvas: $("wbCanvas"),
-    wbTextLayer: $("wbTextLayer"),
-    wbDrawBtn: $("wbDrawBtn"),
-    wbEraseBtn: $("wbEraseBtn"),
-    wbTextBtn: $("wbTextBtn"),
-    wbClearBtn: $("wbClearBtn"),
-    wbColor: $("wbColor"),
-    wbSize: $("wbSize"),
-    wbSizeValue: $("wbSizeValue"),
-    wbUndoBtn: $("wbUndoBtn"),
-    wbRedoBtn: $("wbRedoBtn"),
-    wbAddTextBtn: $("wbAddTextBtn"),
-    wbDeleteTextBtn: $("wbDeleteTextBtn"),
-    wbExportBtn: $("wbExportBtn"),
-    wbModeLabel: $("wbModeLabel"),
+    wsDrawBtn: $("wsDrawBtn"),
+    wsEraseBtn: $("wsEraseBtn"),
+    wsTextBtn: $("wsTextBtn"),
+    wsArrangeBtn: $("wsArrangeBtn"),
+    wsClearBtn: $("wsClearBtn"),
+    wsColor: $("wsColor"),
+    wsSize: $("wsSize"),
+    wsSizeValue: $("wsSizeValue"),
+    wsUndoBtn: $("wsUndoBtn"),
+    wsRedoBtn: $("wsRedoBtn"),
+    wsAddTextBtn: $("wsAddTextBtn"),
+    wsDeleteTextBtn: $("wsDeleteTextBtn"),
+    wsExportBtn: $("wsExportBtn"),
+    wsModeLabel: $("wsModeLabel"),
 
-    colContainer: $("colContainer"),
-    colCanvas: $("colCanvas"),
-    colImageLayer: $("colImageLayer"),
-    colDrawBtn: $("colDrawBtn"),
-    colEraseBtn: $("colEraseBtn"),
-    colArrangeBtn: $("colArrangeBtn"),
-    colClearBtn: $("colClearBtn"),
-    colColor: $("colColor"),
-    colSize: $("colSize"),
-    colSizeValue: $("colSizeValue"),
-    colUndoBtn: $("colUndoBtn"),
-    colRedoBtn: $("colRedoBtn"),
-    colFileInput: $("colFileInput"),
-    webImageUrl: $("webImageUrl"),
-    webImageError: $("webImageError"),
-    addUrlImageBtn: $("addUrlImageBtn"),
-    colArrangeModeBtn: $("colArrangeModeBtn"),
-    colDeleteImageBtn: $("colDeleteImageBtn"),
-    colExportBtn: $("colExportBtn"),
-    colModeLabel: $("colModeLabel")
+    wsFileInput: $("wsFileInput"),
+    wsWebImageUrl: $("wsWebImageUrl"),
+    wsWebImageError: $("wsWebImageError"),
+    wsAddUrlBtn: $("wsAddUrlBtn"),
+    wsDeleteImageBtn: $("wsDeleteImageBtn")
   };
 }
 
@@ -109,7 +84,7 @@ function escapeHtml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -138,12 +113,17 @@ function fillCanvasWhite(canvas) {
 
 function resizeCanvasToContainer(canvas, container, fillWhite) {
   if (!canvas || !container) return;
+
   const rect = container.getBoundingClientRect();
   const width = Math.max(1, Math.floor(rect.width));
   const height = Math.max(1, Math.floor(rect.height));
-  let prev = null;
+  let previousSnapshot = null;
 
-  try { prev = canvas.toDataURL("image/png"); } catch { prev = null; }
+  try {
+    previousSnapshot = canvas.toDataURL("image/png");
+  } catch {
+    previousSnapshot = null;
+  }
 
   canvas.width = width;
   canvas.height = height;
@@ -160,155 +140,162 @@ function resizeCanvasToContainer(canvas, container, fillWhite) {
     ctx.clearRect(0, 0, width, height);
   }
 
-  if (prev) {
-    const img = new Image();
-    img.onload = function () {
-      if (fillWhite) {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, width, height);
-      } else {
-        ctx.clearRect(0, 0, width, height);
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-    };
-    img.src = prev;
+  if (!previousSnapshot) return;
+
+  const img = new Image();
+  img.onload = function () {
+    if (fillWhite) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
+    ctx.drawImage(img, 0, 0, width, height);
+  };
+  img.src = previousSnapshot;
+}
+
+function resizeUnifiedCanvas() {
+  if (!els.uniContainer || !els.uniCanvas) return;
+  resizeCanvasToContainer(els.uniCanvas, els.uniContainer, false);
+}
+
+function drawPushHistory() {
+  try {
+    const data = els.uniCanvas.toDataURL("image/png");
+    const next = state.drawHistory.slice(0, state.drawHistoryIndex + 1);
+    next.push(data);
+    if (next.length > 50) next.shift();
+    state.drawHistory = next;
+    state.drawHistoryIndex = next.length - 1;
+  } catch {
+    // ignore
   }
 }
 
-function renderTab() {
-  const isWhiteboard = state.tab === "whiteboard";
-  els.whiteboardPanel.classList.toggle("hidden", !isWhiteboard);
-  els.collagePanel.classList.toggle("hidden", isWhiteboard);
-  els.tabWhiteboardBtn.classList.toggle("active", isWhiteboard);
-  els.tabCollageBtn.classList.toggle("active", !isWhiteboard);
-}
-
-function setTab(tab) {
-  state.tab = tab;
-  renderTab();
-  requestAnimationFrame(function () {
-    resizeWhiteboardCanvas();
-    resizeCollageCanvas();
-    renderWhiteboardTextBoxes();
-    renderCollageImages();
-  });
-}
-
-function resizeWhiteboardCanvas() {
-  if (!els.wbContainer || !els.wbCanvas) return;
-  resizeCanvasToContainer(els.wbCanvas, els.wbContainer, false);
-}
-
-function wbPushHistory() {
-  try {
-    const data = els.wbCanvas.toDataURL("image/png");
-    const next = state.wbHistory.slice(0, state.wbHistoryIndex + 1);
-    next.push(data);
-    if (next.length > 50) next.shift();
-    state.wbHistory = next;
-    state.wbHistoryIndex = next.length - 1;
-  } catch { /* ignore */ }
-}
-
-function wbRestore(index) {
-  const data = state.wbHistory[index];
+function drawRestore(index) {
+  const data = state.drawHistory[index];
   if (!data) return;
-  const ctx = els.wbCanvas.getContext("2d");
+  const ctx = els.uniCanvas.getContext("2d");
   if (!ctx) return;
+
   const img = new Image();
   img.onload = function () {
-    ctx.clearRect(0, 0, els.wbCanvas.width, els.wbCanvas.height);
-    ctx.drawImage(img, 0, 0, els.wbCanvas.width, els.wbCanvas.height);
+    ctx.clearRect(0, 0, els.uniCanvas.width, els.uniCanvas.height);
+    ctx.drawImage(img, 0, 0, els.uniCanvas.width, els.uniCanvas.height);
   };
   img.src = data;
 }
 
-function setWhiteboardMode(mode, tool) {
-  state.wbMode = mode;
-  if (tool) state.wbTool = tool;
-  els.wbDrawBtn.classList.toggle("active", state.wbMode === "draw" && state.wbTool === "draw");
-  els.wbEraseBtn.classList.toggle("active", state.wbMode === "draw" && state.wbTool === "erase");
-  els.wbTextBtn.classList.toggle("active", state.wbMode === "text");
-  els.wbCanvas.style.pointerEvents = state.wbMode === "draw" ? "auto" : "none";
-  els.wbModeLabel.textContent = "Mode: " + state.wbMode;
-  renderWhiteboardTextBoxes();
+function setWorkspaceMode(mode, tool) {
+  state.mode = mode;
+  if (tool) state.drawTool = tool;
+
+  els.wsDrawBtn.classList.toggle("active", state.mode === "draw" && state.drawTool === "draw");
+  els.wsEraseBtn.classList.toggle("active", state.mode === "draw" && state.drawTool === "erase");
+  els.wsTextBtn.classList.toggle("active", state.mode === "text");
+  els.wsArrangeBtn.classList.toggle("active", state.mode === "objects");
+
+  // Canvas only listens while drawing; otherwise hits fall through to layers below.
+  els.uniCanvas.style.pointerEvents = state.mode === "draw" ? "auto" : "none";
+
+  // Full-area overlays must not use CSS pointer-events:none on the container — that drops hits to
+  // children (text boxes / images). Toggle per mode instead.
+  els.uniTextLayer.style.pointerEvents = state.mode === "text" ? "auto" : "none";
+  els.uniImageLayer.style.pointerEvents = state.mode === "objects" ? "auto" : "none";
+
+  els.wsModeLabel.textContent = "Mode: " + state.mode;
+
+  renderImages();
+  renderTextBoxes();
 }
 
-function updateWhiteboardSize() {
-  els.wbSizeValue.textContent = String(state.wbSize) + "px";
+function updateBrushSizeLabel() {
+  els.wsSizeValue.textContent = String(state.brushSize) + "px";
 }
 
-function wbGetPos(event) { return getPointerPos(event, els.wbCanvas); }
+function drawGetPos(event) {
+  return getPointerPos(event, els.uniCanvas);
+}
 
-function wbPointerDown(event) {
-  if (state.wbMode !== "draw") return;
+function drawPointerDown(event) {
+  if (state.mode !== "draw") return;
   event.preventDefault();
-  state.wbActiveTextId = null;
-  renderWhiteboardTextBoxes();
-  state.wbIsDrawing = true;
-  const pos = wbGetPos(event);
-  const ctx = els.wbCanvas.getContext("2d");
+  state.activeTextId = null;
+  renderTextBoxes();
+  state.drawIsDrawing = true;
+
+  const pos = drawGetPos(event);
+  const ctx = els.uniCanvas.getContext("2d");
   if (!ctx) return;
+
   ctx.beginPath();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.lineWidth = state.wbSize;
-  ctx.strokeStyle = state.wbTool === "erase" ? "#ffffff" : state.wbColor;
+  ctx.lineWidth = state.brushSize;
+  ctx.strokeStyle = state.drawTool === "erase" ? "#ffffff" : state.brushColor;
   ctx.moveTo(pos.x, pos.y);
 }
 
-function wbPointerMove(event) {
-  if (state.wbMode !== "draw" || !state.wbIsDrawing) return;
+function drawPointerMove(event) {
+  if (state.mode !== "draw" || !state.drawIsDrawing) return;
   event.preventDefault();
-  const pos = wbGetPos(event);
-  const ctx = els.wbCanvas.getContext("2d");
+  const pos = drawGetPos(event);
+  const ctx = els.uniCanvas.getContext("2d");
   if (!ctx) return;
   ctx.lineTo(pos.x, pos.y);
   ctx.stroke();
 }
 
-function wbPointerUp(event) {
-  if (state.wbMode !== "draw" || !state.wbIsDrawing) return;
+function drawPointerUp(event) {
+  if (state.mode !== "draw" || !state.drawIsDrawing) return;
   if (event && typeof event.preventDefault === "function") event.preventDefault();
-  state.wbIsDrawing = false;
-  const ctx = els.wbCanvas.getContext("2d");
+  state.drawIsDrawing = false;
+  const ctx = els.uniCanvas.getContext("2d");
   if (ctx) ctx.closePath();
-  wbPushHistory();
+  drawPushHistory();
 }
 
-function wbClear() {
-  const ctx = els.wbCanvas.getContext("2d");
+function drawClear() {
+  const ctx = els.uniCanvas.getContext("2d");
   if (!ctx) return;
-  ctx.clearRect(0, 0, els.wbCanvas.width, els.wbCanvas.height);
+  ctx.clearRect(0, 0, els.uniCanvas.width, els.uniCanvas.height);
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, els.wbCanvas.width, els.wbCanvas.height);
-  wbPushHistory();
+  ctx.fillRect(0, 0, els.uniCanvas.width, els.uniCanvas.height);
+  drawPushHistory();
 }
 
-function wbUndo() {
-  if (state.wbHistoryIndex <= 0) return;
-  state.wbHistoryIndex -= 1;
-  wbRestore(state.wbHistoryIndex);
+function drawUndo() {
+  if (state.drawHistoryIndex <= 0) return;
+  state.drawHistoryIndex -= 1;
+  drawRestore(state.drawHistoryIndex);
 }
 
-function wbRedo() {
-  if (state.wbHistoryIndex >= state.wbHistory.length - 1) return;
-  state.wbHistoryIndex += 1;
-  wbRestore(state.wbHistoryIndex);
+function drawRedo() {
+  if (state.drawHistoryIndex >= state.drawHistory.length - 1) return;
+  state.drawHistoryIndex += 1;
+  drawRestore(state.drawHistoryIndex);
 }
 
-function wbUpdateTextBox(id, patch) {
-  state.wbTextBoxes = state.wbTextBoxes.map(function (box) {
+function getTextBox(id) {
+  return state.textBoxes.find(function (box) {
+    return box.id === id;
+  }) || null;
+}
+
+function updateTextBox(id, patch, rerender = true) {
+  state.textBoxes = state.textBoxes.map(function (box) {
     return box.id === id ? Object.assign({}, box, patch) : box;
   });
-  renderWhiteboardTextBoxes();
+  if (rerender) renderTextBoxes();
 }
 
-function wbAddTextBox() {
-  setWhiteboardMode("text");
-  const rect = els.wbContainer.getBoundingClientRect();
+function addTextBox() {
+  setWorkspaceMode("text");
+  const rect = els.uniContainer.getBoundingClientRect();
   const id = uid();
-  state.wbTextBoxes.push({
+
+  state.textBoxes.push({
     id: id,
     x: Math.max(16, rect.width * 0.1),
     y: Math.max(16, rect.height * 0.1),
@@ -319,21 +306,22 @@ function wbAddTextBox() {
     hasTyped: false,
     hideBorder: false
   });
-  state.wbActiveTextId = id;
-  renderWhiteboardTextBoxes();
+
+  state.activeTextId = id;
+  renderTextBoxes();
 }
 
-function wbDeleteActiveTextBox() {
-  if (!state.wbActiveTextId) return;
-  state.wbTextBoxes = state.wbTextBoxes.filter(function (box) {
-    return box.id !== state.wbActiveTextId;
+function deleteActiveTextBox() {
+  if (!state.activeTextId) return;
+  state.textBoxes = state.textBoxes.filter(function (box) {
+    return box.id !== state.activeTextId;
   });
-  state.wbActiveTextId = null;
-  renderWhiteboardTextBoxes();
+  state.activeTextId = null;
+  renderTextBoxes();
 }
 
 function focusEditableTextBox(id) {
-  const node = els.wbTextLayer.querySelector('[data-text-edit-id="' + id + '"]');
+  const node = els.uniTextLayer.querySelector('[data-text-edit-id="' + id + '"]');
   if (!node) return;
   node.focus();
   const selection = window.getSelection();
@@ -344,13 +332,13 @@ function focusEditableTextBox(id) {
   selection.addRange(range);
 }
 
-function renderWhiteboardTextBoxes() {
-  els.wbDeleteTextBtn.disabled = !state.wbActiveTextId;
-  els.wbTextLayer.innerHTML = "";
-  const interactive = state.wbMode === "text";
+function renderTextBoxes() {
+  els.wsDeleteTextBtn.disabled = !state.activeTextId;
+  els.uniTextLayer.innerHTML = "";
+  const interactive = state.mode === "text";
 
-  state.wbTextBoxes.forEach(function (box) {
-    const active = box.id === state.wbActiveTextId;
+  state.textBoxes.forEach(function (box) {
+    const active = box.id === state.activeTextId;
     const root = document.createElement("div");
     root.className = "text-box" + (active ? " active" : "") + (box.hideBorder ? " no-border" : "");
     root.style.left = box.x + "px";
@@ -381,37 +369,49 @@ function renderWhiteboardTextBoxes() {
     editable.spellcheck = false;
     editable.innerHTML = escapeHtml(box.text).replace(/\n/g, "<br>");
 
-    editable.addEventListener("mousedown", function (event) { event.stopPropagation(); });
+    editable.addEventListener("mousedown", function (event) {
+      event.stopPropagation();
+    });
+
     editable.addEventListener("focus", function () {
-      state.wbActiveTextId = box.id;
-      renderWhiteboardTextBoxes();
+      state.activeTextId = box.id;
+      renderTextBoxes();
     });
+
     editable.addEventListener("input", function (event) {
-      wbUpdateTextBox(box.id, {
-        text: event.currentTarget.innerText || "",
-        hasTyped: true
-      });
+      const value = event.currentTarget.innerText || "";
+      updateTextBox(
+        box.id,
+        {
+          text: value,
+          hasTyped: true,
+          hideBorder: false
+        },
+        false
+      );
     });
-    editable.addEventListener("blur", function () {
-      const found = state.wbTextBoxes.find(function (item) { return item.id === box.id; });
-      if (found && found.hasTyped) {
-        wbUpdateTextBox(box.id, { hideBorder: true });
-      }
+
+    editable.addEventListener("blur", function (event) {
+      updateTextBox(box.id, {
+        text: event.currentTarget.innerText || "",
+        hasTyped: true,
+        hideBorder: true
+      });
     });
 
     root.addEventListener("mousedown", function (event) {
       if (!interactive) return;
       event.stopPropagation();
-      state.wbActiveTextId = box.id;
+      state.activeTextId = box.id;
 
       const handle = event.target.closest('[data-drag-handle="1"]');
       if (!handle) {
-        renderWhiteboardTextBoxes();
+        renderTextBoxes();
         return;
       }
 
       event.preventDefault();
-      state.wbDrag = {
+      state.textDrag = {
         dragging: true,
         id: box.id,
         startX: event.clientX,
@@ -419,7 +419,7 @@ function renderWhiteboardTextBoxes() {
         origX: box.x,
         origY: box.y
       };
-      renderWhiteboardTextBoxes();
+      renderTextBoxes();
     });
 
     inner.appendChild(editable);
@@ -432,27 +432,58 @@ function renderWhiteboardTextBoxes() {
       root.appendChild(badge);
     }
 
-    els.wbTextLayer.appendChild(root);
+    els.uniTextLayer.appendChild(root);
   });
 }
 
-function wbContainerMouseMove(event) {
-  if (!state.wbDrag.dragging) return;
-  const rect = els.wbContainer.getBoundingClientRect();
-  const drag = state.wbDrag;
+function uniContainerMouseMove(event) {
+  if (state.textDrag.dragging) {
+    const rect = els.uniContainer.getBoundingClientRect();
+    const drag = state.textDrag;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    const box = getTextBox(drag.id);
+    if (!box) return;
+
+    updateTextBox(drag.id, {
+      x: Math.min(Math.max(0, drag.origX + dx), Math.max(0, rect.width - box.w)),
+      y: Math.min(Math.max(0, drag.origY + dy), Math.max(0, rect.height - box.h))
+    });
+    return;
+  }
+
+  if (state.mode !== "objects") return;
+  const drag = state.imageDrag;
+  if (!drag.dragging && !drag.resizing) return;
+
+  const rect = els.uniContainer.getBoundingClientRect();
   const dx = event.clientX - drag.startX;
   const dy = event.clientY - drag.startY;
-  const box = state.wbTextBoxes.find(function (item) { return item.id === drag.id; });
-  if (!box) return;
-
-  wbUpdateTextBox(drag.id, {
-    x: Math.min(Math.max(0, drag.origX + dx), Math.max(0, rect.width - box.w)),
-    y: Math.min(Math.max(0, drag.origY + dy), Math.max(0, rect.height - box.h))
+  const obj = state.images.find(function (item) {
+    return item.id === drag.id;
   });
+  if (!obj) return;
+
+  if (drag.dragging) {
+    updateImage(drag.id, {
+      x: Math.min(Math.max(0, drag.origX + dx), Math.max(0, rect.width - obj.w)),
+      y: Math.min(Math.max(0, drag.origY + dy), Math.max(0, rect.height - obj.h))
+    });
+    return;
+  }
+
+  if (drag.resizing) {
+    updateImage(drag.id, {
+      w: Math.min(Math.max(80, drag.origW + dx), Math.max(80, rect.width - drag.origX)),
+      h: Math.min(Math.max(60, drag.origH + dy), Math.max(60, rect.height - drag.origY))
+    });
+  }
 }
 
-function wbContainerMouseUp() {
-  state.wbDrag.dragging = false;
+function uniContainerMouseUp() {
+  state.textDrag.dragging = false;
+  state.imageDrag.dragging = false;
+  state.imageDrag.resizing = false;
 }
 
 function renderWrappedText(ctx, text, x, y, w, h, fontSize) {
@@ -468,6 +499,7 @@ function renderWrappedText(ctx, text, x, y, w, h, fontSize) {
       line = "";
       continue;
     }
+
     const test = line ? line + " " + word : word;
     if (ctx.measureText(test).width <= w) {
       line = test;
@@ -488,19 +520,57 @@ function renderWrappedText(ctx, text, x, y, w, h, fontSize) {
   }
 }
 
-function wbExportPNG() {
+async function unifiedExportPNG() {
   const out = document.createElement("canvas");
-  out.width = els.wbCanvas.width;
-  out.height = els.wbCanvas.height;
+  out.width = els.uniCanvas.width;
+  out.height = els.uniCanvas.height;
   const ctx = out.getContext("2d");
   if (!ctx) return;
 
-  ctx.drawImage(els.wbCanvas, 0, 0);
-  state.wbTextBoxes.forEach(function (box) {
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  function loadImage(src) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = function () {
+        resolve(img);
+      };
+      img.onerror = function () {
+        reject(new Error("failed"));
+      };
+      img.src = src;
+    });
+  }
+
+  for (let i = 0; i < state.images.length; i += 1) {
+    const item = state.images[i];
+    try {
+      const img = await loadImage(item.src);
+      ctx.drawImage(img, item.x, item.y, item.w, item.h);
+    } catch {
+      ctx.save();
+      ctx.fillStyle = "rgba(239,68,68,0.10)";
+      ctx.strokeStyle = "rgba(239,68,68,0.35)";
+      ctx.lineWidth = 2;
+      ctx.fillRect(item.x, item.y, item.w, item.h);
+      ctx.strokeRect(item.x, item.y, item.w, item.h);
+      ctx.fillStyle = "rgba(239,68,68,0.90)";
+      ctx.font = "12px ui-sans-serif, system-ui";
+      ctx.fillText("Image blocked (CORS)", item.x + 10, item.y + 18);
+      ctx.restore();
+    }
+  }
+
+  ctx.drawImage(els.uniCanvas, 0, 0);
+
+  state.textBoxes.forEach(function (box) {
     const fontSize = box.fontSize || 18;
     ctx.save();
     ctx.fillStyle = "#111827";
-    ctx.font = fontSize + "px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
+    ctx.font =
+      fontSize + "px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
     ctx.textBaseline = "top";
     renderWrappedText(
       ctx,
@@ -514,126 +584,23 @@ function wbExportPNG() {
     ctx.restore();
   });
 
-  downloadDataUrl("whiteboard.png", out.toDataURL("image/png"));
+  downloadDataUrl("workspace.png", out.toDataURL("image/png"));
 }
 
-function resizeCollageCanvas() {
-  if (!els.colContainer || !els.colCanvas) return;
-  resizeCanvasToContainer(els.colCanvas, els.colContainer, false);
-}
-
-function colPushHistory() {
-  try {
-    const data = els.colCanvas.toDataURL("image/png");
-    const next = state.colHistory.slice(0, state.colHistoryIndex + 1);
-    next.push(data);
-    if (next.length > 50) next.shift();
-    state.colHistory = next;
-    state.colHistoryIndex = next.length - 1;
-  } catch { /* ignore */ }
-}
-
-function colRestore(index) {
-  const data = state.colHistory[index];
-  if (!data) return;
-  const ctx = els.colCanvas.getContext("2d");
-  if (!ctx) return;
-  const img = new Image();
-  img.onload = function () {
-    ctx.clearRect(0, 0, els.colCanvas.width, els.colCanvas.height);
-    ctx.drawImage(img, 0, 0, els.colCanvas.width, els.colCanvas.height);
-  };
-  img.src = data;
-}
-
-function setCollageMode(mode, tool) {
-  state.colMode = mode;
-  if (tool) state.colTool = tool;
-  els.colDrawBtn.classList.toggle("active", state.colMode === "draw" && state.colTool === "draw");
-  els.colEraseBtn.classList.toggle("active", state.colMode === "draw" && state.colTool === "erase");
-  els.colArrangeBtn.classList.toggle("active", state.colMode === "objects");
-  els.colArrangeModeBtn.classList.toggle("btn-primary", state.colMode === "objects");
-  els.colArrangeModeBtn.classList.toggle("btn-ghost", state.colMode !== "objects");
-  els.colCanvas.style.pointerEvents = state.colMode === "draw" ? "auto" : "none";
-  els.colModeLabel.textContent = "Mode: " + state.colMode;
-  renderCollageImages();
-}
-
-function updateCollageSize() {
-  els.colSizeValue.textContent = String(state.colSize) + "px";
-}
-
-function colGetPos(event) { return getPointerPos(event, els.colCanvas); }
-
-function colPointerDown(event) {
-  if (state.colMode !== "draw") return;
-  event.preventDefault();
-  state.colIsDrawing = true;
-  const pos = colGetPos(event);
-  const ctx = els.colCanvas.getContext("2d");
-  if (!ctx) return;
-  ctx.beginPath();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = state.colSize;
-  ctx.strokeStyle = state.colTool === "erase" ? "#ffffff" : state.colColor;
-  ctx.moveTo(pos.x, pos.y);
-}
-
-function colPointerMove(event) {
-  if (state.colMode !== "draw" || !state.colIsDrawing) return;
-  event.preventDefault();
-  const pos = colGetPos(event);
-  const ctx = els.colCanvas.getContext("2d");
-  if (!ctx) return;
-  ctx.lineTo(pos.x, pos.y);
-  ctx.stroke();
-}
-
-function colPointerUp(event) {
-  if (state.colMode !== "draw" || !state.colIsDrawing) return;
-  if (event && typeof event.preventDefault === "function") event.preventDefault();
-  state.colIsDrawing = false;
-  const ctx = els.colCanvas.getContext("2d");
-  if (ctx) ctx.closePath();
-  colPushHistory();
-}
-
-function colClear() {
-  const ctx = els.colCanvas.getContext("2d");
-  if (!ctx) return;
-  ctx.clearRect(0, 0, els.colCanvas.width, els.colCanvas.height);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, els.colCanvas.width, els.colCanvas.height);
-  colPushHistory();
-}
-
-function colUndo() {
-  if (state.colHistoryIndex <= 0) return;
-  state.colHistoryIndex -= 1;
-  colRestore(state.colHistoryIndex);
-}
-
-function colRedo() {
-  if (state.colHistoryIndex >= state.colHistory.length - 1) return;
-  state.colHistoryIndex += 1;
-  colRestore(state.colHistoryIndex);
-}
-
-function colUpdateImage(id, patch) {
-  state.colImages = state.colImages.map(function (img) {
+function updateImage(id, patch) {
+  state.images = state.images.map(function (img) {
     return img.id === id ? Object.assign({}, img, patch) : img;
   });
-  renderCollageImages();
+  renderImages();
 }
 
-function renderCollageImages() {
-  const interactive = state.colMode === "objects";
-  els.colDeleteImageBtn.disabled = !state.colActiveImageId;
-  els.colImageLayer.innerHTML = "";
+function renderImages() {
+  const interactive = state.mode === "objects";
+  els.wsDeleteImageBtn.disabled = !state.activeImageId;
+  els.uniImageLayer.innerHTML = "";
 
-  state.colImages.forEach(function (imgObj) {
-    const active = imgObj.id === state.colActiveImageId;
+  state.images.forEach(function (imgObj) {
+    const active = imgObj.id === state.activeImageId;
     const root = document.createElement("div");
     root.className = "image-object" + (active ? " active" : "");
     root.style.left = imgObj.x + "px";
@@ -641,12 +608,12 @@ function renderCollageImages() {
     root.style.width = imgObj.w + "px";
     root.style.height = imgObj.h + "px";
     root.style.pointerEvents = interactive ? "auto" : "none";
-    root.title = imgObj.name || "collage";
+    root.title = imgObj.name || "Image";
     root.dataset.id = imgObj.id;
 
     const image = document.createElement("img");
     image.src = imgObj.src;
-    image.alt = "collage";
+    image.alt = "workspace image";
     image.draggable = false;
     image.crossOrigin = "anonymous";
     root.appendChild(image);
@@ -664,8 +631,8 @@ function renderCollageImages() {
       const resizeHandle = event.target.closest('[data-resize-handle="1"]');
       event.stopPropagation();
       event.preventDefault();
-      state.colActiveImageId = imgObj.id;
-      state.colDrag = {
+      state.activeImageId = imgObj.id;
+      state.imageDrag = {
         dragging: !resizeHandle,
         resizing: !!resizeHandle,
         id: imgObj.id,
@@ -676,58 +643,28 @@ function renderCollageImages() {
         origW: imgObj.w,
         origH: imgObj.h
       };
-      renderCollageImages();
+      renderImages();
     });
 
-    els.colImageLayer.appendChild(root);
+    els.uniImageLayer.appendChild(root);
   });
 }
 
-function colContainerMouseMove(event) {
-  if (state.colMode !== "objects") return;
-  const drag = state.colDrag;
-  if (!drag.dragging && !drag.resizing) return;
-  const rect = els.colContainer.getBoundingClientRect();
-  const dx = event.clientX - drag.startX;
-  const dy = event.clientY - drag.startY;
-  const obj = state.colImages.find(function (item) { return item.id === drag.id; });
-  if (!obj) return;
-
-  if (drag.dragging) {
-    colUpdateImage(drag.id, {
-      x: Math.min(Math.max(0, drag.origX + dx), Math.max(0, rect.width - obj.w)),
-      y: Math.min(Math.max(0, drag.origY + dy), Math.max(0, rect.height - obj.h))
-    });
-    return;
-  }
-
-  if (drag.resizing) {
-    colUpdateImage(drag.id, {
-      w: Math.min(Math.max(80, drag.origW + dx), Math.max(80, rect.width - drag.origX)),
-      h: Math.min(Math.max(60, drag.origH + dy), Math.max(60, rect.height - drag.origY))
-    });
-  }
-}
-
-function colContainerMouseUp() {
-  state.colDrag.dragging = false;
-  state.colDrag.resizing = false;
-}
-
-function colDeleteActiveImage() {
-  if (!state.colActiveImageId) return;
-  state.colImages = state.colImages.filter(function (img) {
-    return img.id !== state.colActiveImageId;
+function deleteActiveImage() {
+  if (!state.activeImageId) return;
+  state.images = state.images.filter(function (img) {
+    return img.id !== state.activeImageId;
   });
-  state.colActiveImageId = null;
-  renderCollageImages();
+  state.activeImageId = null;
+  renderImages();
 }
 
-function colAddImageFromFile(file) {
-  const rect = els.colContainer.getBoundingClientRect();
+function addImageFromFile(file) {
+  const rect = els.uniContainer.getBoundingClientRect();
   const reader = new FileReader();
+
   reader.onload = function (event) {
-    state.colImages.push({
+    state.images.push({
       id: uid(),
       src: String(event.target && event.target.result ? event.target.result : ""),
       name: file.name,
@@ -736,29 +673,31 @@ function colAddImageFromFile(file) {
       w: Math.min(320, Math.max(160, rect.width * 0.35)),
       h: Math.min(240, Math.max(120, rect.height * 0.25))
     });
-    setCollageMode("objects");
-    renderCollageImages();
+
+    setWorkspaceMode("objects");
+    renderImages();
   };
+
   reader.readAsDataURL(file);
 }
 
 function showWebImageError(message) {
-  els.webImageError.textContent = message || "";
-  els.webImageError.classList.toggle("hidden", !message);
+  els.wsWebImageError.textContent = message || "";
+  els.wsWebImageError.classList.toggle("hidden", !message);
 }
 
-function colAddImageFromUrl() {
-  const url = els.webImageUrl.value.trim();
+function addImageFromUrl() {
+  const url = els.wsWebImageUrl.value.trim();
   if (!/^https?:\/\//i.test(url)) {
     showWebImageError("Please paste a full http(s) image URL.");
     return;
   }
 
   showWebImageError("");
-  const rect = els.colContainer.getBoundingClientRect();
+  const rect = els.uniContainer.getBoundingClientRect();
   const id = uid();
 
-  state.colImages.push({
+  state.images.push({
     id: id,
     src: url,
     name: "Web image",
@@ -768,194 +707,129 @@ function colAddImageFromUrl() {
     h: Math.min(260, Math.max(120, rect.height * 0.28))
   });
 
-  state.colActiveImageId = id;
-  els.webImageUrl.value = "";
-  setCollageMode("objects");
-  renderCollageImages();
+  state.activeImageId = id;
+  els.wsWebImageUrl.value = "";
+  setWorkspaceMode("objects");
+  renderImages();
 }
 
-async function colExportPNG() {
-  const out = document.createElement("canvas");
-  out.width = els.colCanvas.width;
-  out.height = els.colCanvas.height;
-  const ctx = out.getContext("2d");
-  if (!ctx) return;
+function bindWorkspaceEvents() {
+  els.wsDrawBtn.addEventListener("click", function () {
+    setWorkspaceMode("draw", "draw");
+  });
 
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, out.width, out.height);
+  els.wsEraseBtn.addEventListener("click", function () {
+    setWorkspaceMode("draw", "erase");
+  });
 
-  function loadImage(src) {
-    return new Promise(function (resolve, reject) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = function () { resolve(img); };
-      img.onerror = function () { reject(new Error("failed")); };
-      img.src = src;
-    });
-  }
+  els.wsTextBtn.addEventListener("click", function () {
+    setWorkspaceMode("text");
+  });
 
-  for (let i = 0; i < state.colImages.length; i += 1) {
-    const item = state.colImages[i];
-    try {
-      const img = await loadImage(item.src);
-      ctx.drawImage(img, item.x, item.y, item.w, item.h);
-    } catch {
-      ctx.save();
-      ctx.fillStyle = "rgba(239,68,68,0.10)";
-      ctx.strokeStyle = "rgba(239,68,68,0.35)";
-      ctx.lineWidth = 2;
-      ctx.fillRect(item.x, item.y, item.w, item.h);
-      ctx.strokeRect(item.x, item.y, item.w, item.h);
-      ctx.fillStyle = "rgba(239,68,68,0.9)";
-      ctx.font = "12px ui-sans-serif, system-ui";
-      ctx.fillText("Image blocked (CORS)", item.x + 10, item.y + 18);
-      ctx.restore();
-    }
-  }
+  els.wsArrangeBtn.addEventListener("click", function () {
+    setWorkspaceMode("objects");
+  });
 
-  ctx.drawImage(els.colCanvas, 0, 0);
-  downloadDataUrl("collage.png", out.toDataURL("image/png"));
-}
+  els.wsClearBtn.addEventListener("click", drawClear);
+  els.wsUndoBtn.addEventListener("click", drawUndo);
+  els.wsRedoBtn.addEventListener("click", drawRedo);
+  els.wsDeleteTextBtn.addEventListener("click", deleteActiveTextBox);
+  els.wsExportBtn.addEventListener("click", function () {
+    unifiedExportPNG();
+  });
 
-function bindTabEvents() {
-  els.tabWhiteboardBtn.addEventListener("click", function () { setTab("whiteboard"); });
-  els.tabCollageBtn.addEventListener("click", function () { setTab("collage"); });
-}
-
-function bindWhiteboardEvents() {
-  els.wbDrawBtn.addEventListener("click", function () { setWhiteboardMode("draw", "draw"); });
-  els.wbEraseBtn.addEventListener("click", function () { setWhiteboardMode("draw", "erase"); });
-  els.wbTextBtn.addEventListener("click", function () { setWhiteboardMode("text"); });
-  els.wbClearBtn.addEventListener("click", wbClear);
-  els.wbUndoBtn.addEventListener("click", wbUndo);
-  els.wbRedoBtn.addEventListener("click", wbRedo);
-  els.wbAddTextBtn.addEventListener("click", function () {
-    wbAddTextBox();
+  els.wsAddTextBtn.addEventListener("click", function () {
+    addTextBox();
     requestAnimationFrame(function () {
-      if (state.wbActiveTextId) focusEditableTextBox(state.wbActiveTextId);
+      if (state.activeTextId) focusEditableTextBox(state.activeTextId);
     });
   });
-  els.wbDeleteTextBtn.addEventListener("click", wbDeleteActiveTextBox);
-  els.wbExportBtn.addEventListener("click", wbExportPNG);
 
-  els.wbColor.addEventListener("input", function (event) {
-    state.wbColor = event.target.value;
+  els.wsColor.addEventListener("input", function (event) {
+    state.brushColor = event.target.value;
   });
 
-  els.wbSize.addEventListener("input", function (event) {
-    state.wbSize = Number(event.target.value);
-    updateWhiteboardSize();
+  els.wsSize.addEventListener("input", function (event) {
+    state.brushSize = Number(event.target.value);
+    updateBrushSizeLabel();
   });
 
-  els.wbCanvas.addEventListener("mousedown", wbPointerDown);
-  els.wbCanvas.addEventListener("mousemove", wbPointerMove);
-  els.wbCanvas.addEventListener("mouseup", wbPointerUp);
-  els.wbCanvas.addEventListener("mouseleave", wbPointerUp);
-  els.wbCanvas.addEventListener("touchstart", wbPointerDown, { passive: false });
-  els.wbCanvas.addEventListener("touchmove", wbPointerMove, { passive: false });
-  els.wbCanvas.addEventListener("touchend", wbPointerUp, { passive: false });
+  els.uniCanvas.addEventListener("mousedown", drawPointerDown);
+  els.uniCanvas.addEventListener("mousemove", drawPointerMove);
+  els.uniCanvas.addEventListener("mouseup", drawPointerUp);
+  els.uniCanvas.addEventListener("mouseleave", drawPointerUp);
+  els.uniCanvas.addEventListener("touchstart", drawPointerDown, { passive: false });
+  els.uniCanvas.addEventListener("touchmove", drawPointerMove, { passive: false });
+  els.uniCanvas.addEventListener("touchend", drawPointerUp, { passive: false });
 
-  els.wbContainer.addEventListener("mousemove", wbContainerMouseMove);
-  els.wbContainer.addEventListener("mouseup", wbContainerMouseUp);
-  els.wbContainer.addEventListener("mouseleave", wbContainerMouseUp);
-  els.wbContainer.addEventListener("mousedown", function () {
-    state.wbActiveTextId = null;
-    renderWhiteboardTextBoxes();
-  });
-}
+  els.uniContainer.addEventListener("mousemove", uniContainerMouseMove);
+  els.uniContainer.addEventListener("mouseup", uniContainerMouseUp);
+  els.uniContainer.addEventListener("mouseleave", uniContainerMouseUp);
 
-function bindCollageEvents() {
-  els.colDrawBtn.addEventListener("click", function () { setCollageMode("draw", "draw"); });
-  els.colEraseBtn.addEventListener("click", function () { setCollageMode("draw", "erase"); });
-  els.colArrangeBtn.addEventListener("click", function () { setCollageMode("objects"); });
-  els.colArrangeModeBtn.addEventListener("click", function () { setCollageMode("objects"); });
-  els.colClearBtn.addEventListener("click", colClear);
-  els.colUndoBtn.addEventListener("click", colUndo);
-  els.colRedoBtn.addEventListener("click", colRedo);
-  els.colDeleteImageBtn.addEventListener("click", colDeleteActiveImage);
-  els.colExportBtn.addEventListener("click", colExportPNG);
-
-  els.colColor.addEventListener("input", function (event) {
-    state.colColor = event.target.value;
+  els.uniContainer.addEventListener("mousedown", function () {
+    state.activeTextId = null;
+    renderTextBoxes();
   });
 
-  els.colSize.addEventListener("input", function (event) {
-    state.colSize = Number(event.target.value);
-    updateCollageSize();
-  });
+  window.addEventListener("mouseup", uniContainerMouseUp);
 
-  els.colFileInput.addEventListener("change", function (event) {
+  els.wsFileInput.addEventListener("change", function (event) {
     const file = event.target.files && event.target.files[0];
-    if (file) colAddImageFromFile(file);
+    if (file) addImageFromFile(file);
     event.target.value = "";
   });
 
-  els.addUrlImageBtn.addEventListener("click", colAddImageFromUrl);
-  els.webImageUrl.addEventListener("input", function () { showWebImageError(""); });
-
-  els.colCanvas.addEventListener("mousedown", colPointerDown);
-  els.colCanvas.addEventListener("mousemove", colPointerMove);
-  els.colCanvas.addEventListener("mouseup", colPointerUp);
-  els.colCanvas.addEventListener("mouseleave", colPointerUp);
-  els.colCanvas.addEventListener("touchstart", colPointerDown, { passive: false });
-  els.colCanvas.addEventListener("touchmove", colPointerMove, { passive: false });
-  els.colCanvas.addEventListener("touchend", colPointerUp, { passive: false });
-
-  els.colContainer.addEventListener("mousemove", colContainerMouseMove);
-  els.colContainer.addEventListener("mouseup", colContainerMouseUp);
-  els.colContainer.addEventListener("mouseleave", colContainerMouseUp);
-  els.colContainer.addEventListener("mousedown", function () {
-    state.colActiveImageId = null;
-    renderCollageImages();
+  els.wsAddUrlBtn.addEventListener("click", addImageFromUrl);
+  els.wsWebImageUrl.addEventListener("input", function () {
+    showWebImageError("");
   });
+  els.wsWebImageUrl.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addImageFromUrl();
+    }
+  });
+
+  els.wsDeleteImageBtn.addEventListener("click", deleteActiveImage);
 }
 
 function bindResizeEvents() {
   window.addEventListener("resize", function () {
-    resizeWhiteboardCanvas();
-    resizeCollageCanvas();
-    renderWhiteboardTextBoxes();
-    renderCollageImages();
+    resizeUnifiedCanvas();
+    renderTextBoxes();
+    renderImages();
   });
 }
 
 export function initWorkspace() {
   if (initialized) return;
+
   bindEls();
-  if (!els.wbContainer || !els.colContainer) return;
+  if (!els.uniContainer || !els.uniCanvas) return;
 
   initialized = true;
 
-  bindTabEvents();
-  bindWhiteboardEvents();
-  bindCollageEvents();
+  bindWorkspaceEvents();
   bindResizeEvents();
 
-  updateWhiteboardSize();
-  updateCollageSize();
-  setWhiteboardMode("draw", "draw");
-  setCollageMode("draw", "draw");
-  renderTab();
-  renderWhiteboardTextBoxes();
-  renderCollageImages();
+  updateBrushSizeLabel();
+  setWorkspaceMode("draw", "draw");
+  renderTextBoxes();
+  renderImages();
 
   requestAnimationFrame(function () {
-    resizeWhiteboardCanvas();
-    resizeCollageCanvas();
-    fillCanvasWhite(els.wbCanvas);
-    fillCanvasWhite(els.colCanvas);
-    wbPushHistory();
-    colPushHistory();
+    resizeUnifiedCanvas();
+    fillCanvasWhite(els.uniCanvas);
+    drawPushHistory();
   });
 }
 
-// Call after making the workspace view visible to re-measure canvas.
 export function refreshWorkspaceCanvas() {
   if (!initialized) return;
+
   requestAnimationFrame(function () {
-    resizeWhiteboardCanvas();
-    resizeCollageCanvas();
-    renderWhiteboardTextBoxes();
-    renderCollageImages();
+    resizeUnifiedCanvas();
+    renderTextBoxes();
+    renderImages();
   });
 }

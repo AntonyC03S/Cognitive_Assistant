@@ -27,9 +27,11 @@ let evtSource = null;
 let timerCtrl = null;
 let workspaceReady = false;
 
-function setStatus(t) { statusEl.textContent = t || ""; }
+function setStatus(message) {
+  statusEl.textContent = message || "";
+}
 
-function clearQr() {
+function clearQrDisplay() {
   qrDiv.innerHTML = "";
   uploadLink.textContent = "";
   uploadLink.href = "#";
@@ -40,30 +42,79 @@ function setImage(url) {
   resultImg.src = withCacheBust(url);
 }
 
-function setActiveSwitch(active) {
-  showQrViewBtn.classList.toggle("secondary", active !== "qr");
-  showWorkspaceViewBtn.classList.toggle("secondary", active !== "workspace");
+function closeEventStream() {
+  if (!evtSource) return;
+  evtSource.close();
+  evtSource = null;
+}
+
+function setSwitchState(activeView) {
+  const qrActive = activeView === "qr";
+  showQrViewBtn.classList.toggle("active", qrActive);
+  showQrViewBtn.classList.toggle("secondary", !qrActive);
+  showWorkspaceViewBtn.classList.toggle("active", !qrActive);
+  showWorkspaceViewBtn.classList.toggle("secondary", qrActive);
 }
 
 function showQr() {
   qrView.classList.remove("hidden");
   workspaceView.classList.add("hidden");
-  setActiveSwitch("qr");
+  setSwitchState("qr");
 }
 
 function showWorkspace() {
   qrView.classList.add("hidden");
   workspaceView.classList.remove("hidden");
-  setActiveSwitch("workspace");
+  setSwitchState("workspace");
 
   if (!workspaceReady) {
     initWorkspace();
     workspaceReady = true;
   }
+
   refreshWorkspaceCanvas();
 }
 
-(async function init() {
+async function createSessionQr() {
+  clearQrDisplay();
+  resultImg.removeAttribute("src");
+  setStatus("Creating session...");
+  makeQrBtn.disabled = true;
+
+  try {
+    const data = await api("/api/session", "GET");
+    const sessionId = data.sessionId;
+
+    new globalThis.QRCode(qrDiv, {
+      text: data.uploadUrl,
+      width: 220,
+      height: 220
+    });
+
+    uploadLink.href = data.uploadUrl;
+    uploadLink.textContent = data.uploadUrl;
+    setStatus("Scan the QR code on your phone and upload an image.");
+
+    closeEventStream();
+    evtSource = new EventSource(`/api/stream/session/${encodeURIComponent(sessionId)}`);
+
+    evtSource.addEventListener("image", (event) => {
+      const message = JSON.parse(event.data);
+      setImage(message.publicUrl);
+      setStatus("Image received.");
+    });
+
+    evtSource.addEventListener("error", () => {
+      setStatus("Live updates disconnected. Reload if you need to reconnect.");
+    });
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : "Failed to create a QR session.");
+  } finally {
+    makeQrBtn.disabled = false;
+  }
+}
+
+async function init() {
   await initTopbar({ requireAuth: true });
 
   if (!hasConsent()) {
@@ -74,11 +125,11 @@ function showWorkspace() {
   timerCtrl = initCountdownTimer();
 
   const url = new URL(window.location.href);
-  const forced = url.searchParams.get("tour") === "1";
-  const autoStart = forced || !hasTutorial();
+  const forcedTour = url.searchParams.get("tour") === "1";
+  const autoStartTour = forcedTour || !hasTutorial();
 
   initJoyrideTour({
-    autoStart,
+    autoStart: autoStartTour,
     getTimerCtrl: () => timerCtrl,
     onComplete: () => {
       setTutorial();
@@ -88,43 +139,13 @@ function showWorkspace() {
 
   showQrViewBtn.addEventListener("click", showQr);
   showWorkspaceViewBtn.addEventListener("click", showWorkspace);
+  makeQrBtn.addEventListener("click", createSessionQr);
+  window.addEventListener("beforeunload", closeEventStream);
+
   showQr();
-
   initChat();
+}
 
-  setTimeout(() => {
-    document.getElementById("helpBtn")?.click();
-  }, 0);
-})();
-
-makeQrBtn.addEventListener("click", async () => {
-  clearQr();
-  resultImg.removeAttribute("src");
-  setStatus("Creating session...");
-
-  try {
-    const data = await api("/api/session", "GET");
-    const sessionId = data.sessionId;
-
-    new globalThis.QRCode(qrDiv, { text: data.uploadUrl, width: 220, height: 220 });
-    uploadLink.href = data.uploadUrl;
-    uploadLink.textContent = data.uploadUrl;
-
-    setStatus("Scan QR on phone and upload.");
-
-    if (evtSource) evtSource.close();
-    evtSource = new EventSource(`/api/stream/session/${encodeURIComponent(sessionId)}`);
-
-    evtSource.addEventListener("image", (evt) => {
-      const msg = JSON.parse(evt.data);
-      setImage(msg.publicUrl);
-      setStatus("Displayed.");
-    });
-
-    evtSource.addEventListener("error", () => {
-      setStatus("Live updates disconnected (reload page if needed).");
-    });
-  } catch (e) {
-    setStatus(e.message);
-  }
+init().catch((error) => {
+  setStatus(error instanceof Error ? error.message : "Initialization failed.");
 });

@@ -1,4 +1,4 @@
-import { initTopbar, hasConsent, setTutorial } from "/js/common.js";
+import { initTopbar, hasConsent } from "/js/common.js";
 
 const btn = document.getElementById("continueBtn");
 
@@ -12,6 +12,5 @@ const btn = document.getElementById("continueBtn");
 })();
 
 btn.addEventListener("click", () => {
-  setTutorial();
   window.location.href = "/html/qr.html";
 });
