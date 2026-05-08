@@ -1,8 +1,12 @@
-import { api } from "/js/common.js";
+import { api, getAppConfig } from "/js/common.js";
 
 // Keep short shared context to avoid very long prompts and responses.
 const MAX_HISTORY = 20;
 const SHARED_HISTORY_KEY = "chatHistory_shared";
+const DEFAULT_WELCOME = "Hi! I am a creative idea coach. Ask me anything about your project ideas.";
+
+// Resolved from config.json (aiChat.welcomeMessage) on first widget render.
+let welcomeMessage = DEFAULT_WELCOME;
 
 function cleanReplyText(reply) {
   return String(reply || "").replace(/\*\*/g, "").replace(/\|/g, "").trim();
@@ -46,7 +50,7 @@ export function initChatWidget({
     if (history.length === 0) {
       const hint = document.createElement("div");
       hint.className = "chatMsg model";
-      hint.textContent = "Hi! I am a creative idea coach. Ask me anything about your project ideas.";
+      hint.textContent = welcomeMessage;
       messagesEl.appendChild(hint);
       return;
     }
@@ -164,7 +168,7 @@ export function initChat() {
     for (const w of widgets) {
       w.messagesEl.innerHTML = "";
       if (history.length === 0) {
-        addMessageTo(w.messagesEl, "model", "Hi! I am a creative idea coach. Ask me anything about your project ideas.");
+        addMessageTo(w.messagesEl, "model", welcomeMessage);
         continue;
       }
       for (const msg of history) {
@@ -231,4 +235,15 @@ export function initChat() {
   }
 
   renderAll();
+
+  // Pull the configurable welcome message from /api/config and re-render the
+  // empty-state hint if it changed. Done after first paint so chat shows up
+  // immediately even if the config request is slow.
+  getAppConfig().then((cfg) => {
+    const next = cfg?.aiChat?.welcomeMessage;
+    if (next && next !== welcomeMessage) {
+      welcomeMessage = next;
+      if (history.length === 0) renderAll();
+    }
+  });
 }

@@ -10,6 +10,16 @@ export async function api(path, method = "GET", body) {
   return data;
 }
 
+// Cached fetch of the editable runtime config (config.json on the server).
+// Backed by /api/config which re-reads the file on every request.
+let _appConfigPromise = null;
+export function getAppConfig() {
+  if (!_appConfigPromise) {
+    _appConfigPromise = api("/api/config", "GET").catch(() => ({}));
+  }
+  return _appConfigPromise;
+}
+
 /** For `<img src>` reloads so the browser does not show a stale cached image. */
 export function withCacheBust(url) {
   if (!url) return url;

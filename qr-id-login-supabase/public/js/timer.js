@@ -1,8 +1,23 @@
-import { api, clearFlowFlags } from "/js/common.js";
+import { api, clearFlowFlags, getAppConfig } from "/js/common.js";
 
 // Persist countdown in sessionStorage so refresh/tab switches keep timing.
 const STORAGE_KEY = "qrCountdownState_v4";
-const DURATION_MS = 30 * 60 * 1000;
+const DEFAULT_DURATION_MS = 30 * 60 * 1000;
+
+// Lazily resolved from /api/config (config.json -> timer.durationMinutes).
+// Falls back to 30 minutes if the config can't be read.
+let _durationMs = DEFAULT_DURATION_MS;
+
+async function loadDurationMs() {
+  try {
+    const cfg = await getAppConfig();
+    const minutes = Number(cfg?.timer?.durationMinutes);
+    if (Number.isFinite(minutes) && minutes > 0) {
+      _durationMs = Math.round(minutes * 60 * 1000);
+    }
+  } catch { /* keep default */ }
+  return _durationMs;
+}
 
 function now() { return Date.now(); }
 function pad2(n) { return String(n).padStart(2, "0"); }
@@ -28,7 +43,7 @@ function saveState(state) {
 }
 
 function newState() {
-  return { running: true, deadline: now() + DURATION_MS, remaining_ms: DURATION_MS };
+  return { running: true, deadline: now() + _durationMs, remaining_ms: _durationMs };
 }
 
 async function endToEndingScreen() {
@@ -39,12 +54,16 @@ async function endToEndingScreen() {
   window.location.href = "/html/ending.html";
 }
 
-export function initCountdownTimer() {
+export async function initCountdownTimer() {
   const timerText = document.getElementById("timerText");
   const pauseBtn = document.getElementById("pauseBtn");
   const endBtn = document.getElementById("endBtn");
 
   if (!timerText || !pauseBtn || !endBtn) return null;
+
+  // Resolve duration from config before creating a fresh state. If a saved
+  // state already exists, we keep its deadline so refreshes don't reset.
+  await loadDurationMs();
 
   let state = loadState() || newState();
   saveState(state);

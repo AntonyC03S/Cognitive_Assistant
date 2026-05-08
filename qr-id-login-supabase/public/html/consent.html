@@ -127,8 +127,8 @@
         <div class="panel consent-card">
           <div class="header-block">
             <div>
-              <h1 class="text-2xl font-semibold" style="margin: 0;">Consent Form</h1>
-              <p class="text-sm text-muted mt-1" style="margin: 6px 0 0;">
+              <h1 id="consentTitle" class="text-2xl font-semibold" style="margin: 0;">Consent Form</h1>
+              <p id="consentSubtitle" class="text-sm text-muted mt-1" style="margin: 6px 0 0;">
                 Please review and sign to continue.
               </p>
             </div>
@@ -143,24 +143,13 @@
           </div>
 
           <div class="consent-copy">
-            <p>
-              You are being asked to participate in a research study. Your participation is voluntary.
-              You may stop at any time.
-            </p>
-
-            <ul>
-              <li>Task: use a digital whiteboard and/or build a collage.</li>
-              <li>Data: your drawings and any images you add may be saved.</li>
-              <li>Risks: minimal; avoid sharing sensitive personal info.</li>
-            </ul>
-
-            <p style="margin-top: 14px;">
-              Replace this consent text with your institution approved language.
-            </p>
+            <p id="consentIntro"></p>
+            <ul id="consentBullets"></ul>
+            <p id="consentExtra" style="margin-top: 14px;"></p>
           </div>
 
           <div class="consent-field">
-            <label class="label" for="participantId">Participant ID (optional)</label>
+            <label id="participantIdLabel" class="label" for="participantId">Participant ID (optional)</label>
             <input
               id="participantId"
               class="input"
@@ -172,7 +161,7 @@
 
           <label class="checkbox-row" for="agreeCheckbox">
             <input id="agreeCheckbox" type="checkbox" />
-            <span>I have read the information above and consent to participate.</span>
+            <span id="consentAgreeLabel">I have read the information above and consent to participate.</span>
           </label>
 
           <div id="consentError" class="error-box hidden"></div>

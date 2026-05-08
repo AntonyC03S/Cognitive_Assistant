@@ -192,7 +192,7 @@ async function init() {
     return;
   }
 
-  timerCtrl = initCountdownTimer();
+  timerCtrl = await initCountdownTimer();
 
   const url = new URL(window.location.href);
   const forcedTour = url.searchParams.get("tour") === "1";

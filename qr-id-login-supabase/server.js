@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import crypto from "crypto";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -15,6 +16,20 @@ import { GoogleGenAI } from "@google/genai";
 // auth + sessioned uploads + realtime streams + gallery + AI chat.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Editable runtime config (timer length, consent text, AI prompt, ...).
+// Re-read on every access so edits to config.json take effect without restart.
+const CONFIG_PATH = path.join(__dirname, "config.json");
+
+function loadAppConfig() {
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, "utf8");
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("[config] failed to read config.json:", e?.message);
+    return {};
+  }
+}
 
 const app = express();
 app.set("trust proxy", true);
@@ -33,9 +48,6 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SESSION_SECRET) {
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const CHAT_MODEL = process.env.GOOGLE_CHAT_MODEL || "gemini-3-flash-preview";
-// Safety cap so UI does not get huge assistant messages.
-const CHAT_MAX_OUTPUT_CHARS = Number(process.env.CHAT_MAX_OUTPUT_CHARS || 2000);
 const genai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
 
 function cleanModelText(text) {
@@ -50,6 +62,20 @@ app.use(cookieParser());
 
 app.get("/", (req, res) => {
   res.redirect(302, "/html/index.html");
+});
+
+// Public config for the front-end (timer, consent text, chat welcome message).
+// Server-side secrets and the full system prompt are intentionally not exposed.
+app.get("/api/config", (_req, res) => {
+  const cfg = loadAppConfig();
+  const ai = cfg.aiChat || {};
+  res.json({
+    timer: cfg.timer || {},
+    consent: cfg.consent || {},
+    aiChat: {
+      welcomeMessage: ai.welcomeMessage || ""
+    }
+  });
 });
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -401,58 +427,34 @@ app.post("/api/chat", async (req, res) => {
     { role: "user", parts: [{ text: message }] }
   ];
 
+  // Read AI settings from the editable config on every request so changes to
+  // config.json (prompt, model, limits) take effect without a server restart.
+  const cfg = loadAppConfig();
+  const ai = cfg.aiChat || {};
+  const chatModel = process.env.GOOGLE_CHAT_MODEL || ai.model || "gemini-3-flash-preview";
+  const maxOutputTokens = Number(ai.maxOutputTokens) || 1200;
+  const maxOutputChars = Number(process.env.CHAT_MAX_OUTPUT_CHARS) || Number(ai.maxOutputChars) || 2000;
+  const systemInstruction = String(ai.systemPrompt || "").trim();
+
   try {
-    // Keep answers concise for in-app assistant UX.
     const response = await genai.models.generateContent({
-      model: CHAT_MODEL,
+      model: chatModel,
       config: {
-        systemInstruction:
-          `You are a brainstorming assistant. The user gives you a goal or topic, and you list DIFFERENT WAYS, METHODS, TOOLS, or APPROACHES to accomplish it.
-
-Examples of how to think:
-- Goal "travel from A to B" -> ideas: walk, bike, car, train, plane, boat.
-- Goal "cut something" -> ideas: knife, scissors, saw, laser, axe.
-- Goal "make a video" -> ideas: phone camera, DSLR, screen recording, animation, stop-motion.
-- Goal "learn a language" -> ideas: app, tutor, immersion, books, language exchange.
-
-Rules for EVERY response:
-- Never greet, never introduce yourself, never ask questions.
-- Output plain text only. No markdown, no bold, no asterisks, no quotes.
-- Give exactly 5 distinct options. Each must be a different real-world method or tool, not variations of the same one.
-- Each option must be specific and named (e.g. "Train", "Laser cutter", "DSLR camera"), not vague ("Quick option", "Tool helper").
-- Keep each line short and concrete.
-
-Use this exact format and headings:
-Idea 1: <name of method or tool>
-Why it works: <one short sentence on what makes it good for this goal>
-
-Idea 2: <name of method or tool>
-Why it works: <one short sentence>
-
-Idea 3: <name of method or tool>
-Why it works: <one short sentence>
-
-Idea 4: <name of method or tool>
-Why it works: <one short sentence>
-
-Idea 5: <name of method or tool>
-Why it works: <one short sentence>
-
-Best pick: Idea <N>, because <one short reason>.`,
-        maxOutputTokens: 1200
+        systemInstruction,
+        maxOutputTokens
       },
       contents
     });
 
     const rawText = cleanModelText(response?.text);
-    console.log("[chat] model:", CHAT_MODEL, "len:", rawText.length);
+    console.log("[chat] model:", chatModel, "len:", rawText.length);
     if (!rawText) {
       console.log("[chat] empty response object:", JSON.stringify(response).slice(0, 500));
       return res.status(500).json({ error: "Model returned empty response. Try a different model." });
     }
     const text =
-      rawText.length > CHAT_MAX_OUTPUT_CHARS
-        ? rawText.slice(0, CHAT_MAX_OUTPUT_CHARS - 1).trimEnd() + "…"
+      rawText.length > maxOutputChars
+        ? rawText.slice(0, maxOutputChars - 1).trimEnd() + "…"
         : rawText;
     res.json({ reply: text });
   } catch (e) {
