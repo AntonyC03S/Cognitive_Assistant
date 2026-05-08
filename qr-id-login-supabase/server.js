@@ -35,8 +35,15 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const CHAT_MODEL = process.env.GOOGLE_CHAT_MODEL || "gemini-3-flash-preview";
 // Safety cap so UI does not get huge assistant messages.
-const CHAT_MAX_OUTPUT_CHARS = Number(process.env.CHAT_MAX_OUTPUT_CHARS || 700);
+const CHAT_MAX_OUTPUT_CHARS = Number(process.env.CHAT_MAX_OUTPUT_CHARS || 2000);
 const genai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
+
+function cleanModelText(text) {
+  return String(text || "")
+    .replace(/\*\*/g, "")
+    .replace(/\|/g, "")
+    .trim();
+}
 
 app.use(express.json());
 app.use(cookieParser());
@@ -400,36 +407,56 @@ app.post("/api/chat", async (req, res) => {
       model: CHAT_MODEL,
       config: {
         systemInstruction:
-          `Act like a creative idea coach. Your job is to help me discover what I want to make. Start by asking focused questions about:
-          -what I enjoy
-          -what skills I have
-          -what kind of project I want
-          -who it is for
-          -what style or mood I want
-          -how much time or effort I can spend
+          `You are a brainstorming assistant. The user gives you a goal or topic, and you list DIFFERENT WAYS, METHODS, TOOLS, or APPROACHES to accomplish it.
 
-          After that, generate a list of project ideas tailored to my answers. For each idea, include:
+Examples of how to think:
+- Goal "travel from A to B" -> ideas: walk, bike, car, train, plane, boat.
+- Goal "cut something" -> ideas: knife, scissors, saw, laser, axe.
+- Goal "make a video" -> ideas: phone camera, DSLR, screen recording, animation, stop-motion.
+- Goal "learn a language" -> ideas: app, tutor, immersion, books, language exchange.
 
-          -title
-          -concept
-          -why it fits me
-          -possible style
-          -difficulty level
-          -first step to begin
+Rules for EVERY response:
+- Never greet, never introduce yourself, never ask questions.
+- Output plain text only. No markdown, no bold, no asterisks, no quotes.
+- Give exactly 5 distinct options. Each must be a different real-world method or tool, not variations of the same one.
+- Each option must be specific and named (e.g. "Train", "Laser cutter", "DSLR camera"), not vague ("Quick option", "Tool helper").
+- Keep each line short and concrete.
 
-          Then rank the top 3 ideas and explain which one is best for me and why.`,
-        maxOutputTokens: 300
+Use this exact format and headings:
+Idea 1: <name of method or tool>
+Why it works: <one short sentence on what makes it good for this goal>
+
+Idea 2: <name of method or tool>
+Why it works: <one short sentence>
+
+Idea 3: <name of method or tool>
+Why it works: <one short sentence>
+
+Idea 4: <name of method or tool>
+Why it works: <one short sentence>
+
+Idea 5: <name of method or tool>
+Why it works: <one short sentence>
+
+Best pick: Idea <N>, because <one short reason>.`,
+        maxOutputTokens: 1200
       },
       contents
     });
 
-    const rawText = String(response?.text ?? "").trim();
+    const rawText = cleanModelText(response?.text);
+    console.log("[chat] model:", CHAT_MODEL, "len:", rawText.length);
+    if (!rawText) {
+      console.log("[chat] empty response object:", JSON.stringify(response).slice(0, 500));
+      return res.status(500).json({ error: "Model returned empty response. Try a different model." });
+    }
     const text =
       rawText.length > CHAT_MAX_OUTPUT_CHARS
         ? rawText.slice(0, CHAT_MAX_OUTPUT_CHARS - 1).trimEnd() + "…"
         : rawText;
     res.json({ reply: text });
   } catch (e) {
+    console.error("[chat] error:", e?.message);
     res.status(500).json({ error: e?.message || "AI request failed" });
   }
 });

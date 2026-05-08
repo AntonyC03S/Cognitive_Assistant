@@ -4,6 +4,10 @@ import { api } from "/js/common.js";
 const MAX_HISTORY = 20;
 const SHARED_HISTORY_KEY = "chatHistory_shared";
 
+function cleanReplyText(reply) {
+  return String(reply || "").replace(/\*\*/g, "").replace(/\|/g, "").trim();
+}
+
 function loadHistoryFor(key) {
   try {
     const raw = sessionStorage.getItem(key);
@@ -80,7 +84,7 @@ export function initChatWidget({
 
       thinking.remove();
 
-      const reply = String(data?.reply || "").trim() || "(no response)";
+      const reply = cleanReplyText(data?.reply) || "(no response)";
       addMessageEl("model", reply);
 
       history.push({ role: "user", text: trimmed });
@@ -194,7 +198,7 @@ export function initChat() {
         history: historyForApi
       });
 
-      const reply = String(data?.reply || "").trim() || "(no response)";
+      const reply = cleanReplyText(data?.reply) || "(no response)";
 
       for (const node of thinkingNodes) node.remove();
       appendToAll("model", reply);

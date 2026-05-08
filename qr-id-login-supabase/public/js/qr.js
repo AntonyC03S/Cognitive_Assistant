@@ -112,20 +112,21 @@ async function loadRecentUploads() {
 
 function setSwitchState(activeView) {
   const qrActive = activeView === "qr";
-  showQrViewBtn.classList.toggle("active", qrActive);
-  showQrViewBtn.classList.toggle("secondary", !qrActive);
-  showWorkspaceViewBtn.classList.toggle("active", !qrActive);
-  showWorkspaceViewBtn.classList.toggle("secondary", qrActive);
+  showQrViewBtn?.classList.toggle("active", qrActive);
+  showQrViewBtn?.classList.toggle("secondary", !qrActive);
+  showWorkspaceViewBtn?.classList.toggle("active", !qrActive);
+  showWorkspaceViewBtn?.classList.toggle("secondary", qrActive);
 }
 
 function showQr() {
-  qrView.classList.remove("hidden");
-  workspaceView.classList.add("hidden");
+  qrView?.classList.remove("hidden");
+  workspaceView?.classList.add("hidden");
   setSwitchState("qr");
 }
 
 function showWorkspace() {
-  qrView.classList.add("hidden");
+  if (!workspaceView) return;
+  qrView?.classList.add("hidden");
   workspaceView.classList.remove("hidden");
   setSwitchState("workspace");
 
@@ -206,8 +207,8 @@ async function init() {
     }
   });
 
-  showQrViewBtn.addEventListener("click", showQr);
-  showWorkspaceViewBtn.addEventListener("click", showWorkspace);
+  showQrViewBtn?.addEventListener("click", showQr);
+  showWorkspaceViewBtn?.addEventListener("click", showWorkspace);
   makeQrBtn.addEventListener("click", createSessionQr);
   window.addEventListener("beforeunload", closeEventStream);
 
