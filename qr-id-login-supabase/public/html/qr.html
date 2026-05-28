@@ -63,17 +63,16 @@
           <div class="connectPanelHeader">
             <div>
               <h2>Connect Phone</h2>
-              <p class="connectPanelSub">Generate a QR code to open upload on your phone.</p>
+              <p class="connectPanelSub">Scan the QR code with your phone, or click it to open the upload page.</p>
             </div>
-            <button id="makeQrBtn" class="button" type="button">Generate QR</button>
           </div>
 
           <div id="status" class="status" aria-live="polite"></div>
 
           <div class="qrRow">
             <div>
-              <div id="qr" class="qrBox"></div>
-              <a id="uploadLink" class="link" href="#" target="_blank" rel="noreferrer"></a>
+              <div id="qr" class="qrBox" role="link" tabindex="0" aria-label="Open upload page"></div>
+              <div class="qrHint muted-note">Tap or scan to open upload</div>
             </div>
 
             <div class="preview">

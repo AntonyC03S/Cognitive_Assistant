@@ -1,18 +1,18 @@
 /* Whiteboard + Collage + Consent form styles, moved from whiteboard.html. */
 
 :root {
-  --wb-panel: #ffffff;
-  --wb-border: #e5e7eb;
-  --wb-border-strong: #d1d5db;
-  --wb-text: #111827;
-  --wb-muted: #6b7280;
-  --wb-muted-2: #9ca3af;
-  --wb-primary: #4f46e5;
-  --wb-primary-hover: #4338ca;
+  --wb-panel: var(--color-surface);
+  --wb-border: var(--color-border);
+  --wb-border-strong: var(--color-border-strong);
+  --wb-text: var(--color-text);
+  --wb-muted: var(--color-muted);
+  --wb-muted-2: var(--color-muted-2);
+  --wb-primary: var(--color-primary);
+  --wb-primary-hover: var(--color-primary-hover);
   --wb-danger: #dc2626;
-  --wb-danger-bg: #fef2f2;
-  --wb-danger-border: #fecaca;
-  --wb-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --wb-danger-bg: var(--color-danger-bg);
+  --wb-danger-border: var(--color-danger-border);
+  --wb-shadow: var(--shadow-sm);
   --wb-radius-xl: 16px;
   --wb-radius-2xl: 20px;
 }
@@ -74,8 +74,8 @@
   padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid var(--wb-border);
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--color-primary-soft);
+  color: var(--color-text);
   transition: 120ms ease;
 }
 .btn:hover:not(:disabled) { filter: brightness(0.98); }
@@ -83,7 +83,7 @@
 .btn-primary { background: var(--wb-primary); color: white; border-color: var(--wb-primary); }
 .btn-primary:hover:not(:disabled) { background: var(--wb-primary-hover); border-color: var(--wb-primary-hover); }
 
-.btn-ghost { background: white; color: #374151; border-color: var(--wb-border); }
+.btn-ghost { background: white; color: var(--color-primary); border-color: var(--wb-border); }
 
 .btn-danger-soft { background: var(--wb-danger-bg); color: var(--wb-danger); border-color: transparent; }
 
@@ -106,8 +106,8 @@
   background: white;
 }
 .app-shell .input:focus {
-  border-color: #c7d2fe;
-  box-shadow: 0 0 0 3px rgba(199, 210, 254, 0.55);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.18);
 }
 
 .color-input { height: 40px; padding: 0; border: none; background: transparent; }
@@ -190,7 +190,7 @@
   border-radius: 12px;
   border: 1px solid var(--wb-danger-border);
   background: var(--wb-danger-bg);
-  color: #b91c1c;
+  color: var(--color-danger-text);
   padding: 10px 12px;
   font-size: 14px;
 }
@@ -201,7 +201,7 @@
   gap: 16px;
   margin-top: 24px;
   font-size: 14px;
-  color: #374151;
+  color: var(--color-text);
   line-height: 1.6;
 }
 .checkbox-row input {
@@ -325,7 +325,7 @@ ul.info-list { margin: 0; padding-left: 20px; }
 
 /* Soften workspace panels so they flow with page */
 #workspaceView .panel {
-  border-color: #e8edf3;
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+  border-color: var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }

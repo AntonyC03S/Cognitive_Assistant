@@ -35,9 +35,9 @@ function saveConsentRecord(record) {
 }
 
 function goNext() {
-  // Session flag is what app flow checks before allowing tutorial/QR.
+  // Session flag is what app flow checks before allowing the QR page.
   setConsent();
-  window.location.href = "/html/tutorial.html";
+  window.location.href = "/html/qr.html?tour=1";
 }
 
 function submitConsent() {
