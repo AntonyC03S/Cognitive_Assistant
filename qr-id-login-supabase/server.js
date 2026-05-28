@@ -431,7 +431,7 @@ app.post("/api/chat", async (req, res) => {
   // config.json (prompt, model, limits) take effect without a server restart.
   const cfg = loadAppConfig();
   const ai = cfg.aiChat || {};
-  const chatModel = process.env.GOOGLE_CHAT_MODEL || ai.model || "gemini-3-flash-preview";
+  const chatModel = process.env.GOOGLE_CHAT_MODEL || ai.model || "gemini-2.5-flash-preview";
   const maxOutputTokens = Number(ai.maxOutputTokens) || 1200;
   const maxOutputChars = Number(process.env.CHAT_MAX_OUTPUT_CHARS) || Number(ai.maxOutputChars) || 2000;
   const systemInstruction = String(ai.systemPrompt || "").trim();
